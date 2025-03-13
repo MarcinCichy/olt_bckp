@@ -1,5 +1,3 @@
-# device_manager.py
-
 from device import Device
 from logger_conf import logger
 

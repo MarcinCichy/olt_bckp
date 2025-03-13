@@ -1,5 +1,3 @@
-# device.py
-
 import time
 import paramiko
 from text_processing import process_text
@@ -17,6 +15,7 @@ class Device:
         self.client = None                 # Obiekt SSHClient z biblioteki paramiko (połączenie SSH)
         self.channel = None                # Kanał komunikacyjny SSH
         self.sysname = ""                  # Nazwa systemu pobrana z wyniku komendy 4
+
 
     def connect(self):
         # Nawiązywanie połączenia SSH z urządzeniem
@@ -36,6 +35,7 @@ class Device:
         # Otwarcie interaktywnego kanału SSH
         self.channel = self.client.invoke_shell()
         time.sleep(1)  # Odczekanie, aż kanał będzie gotowy do komunikacji
+
 
     def execute_command(self, command):
         # Wykonuje pojedynczą komendę na urządzeniu przez kanał SSH

@@ -1,0 +1,4 @@
+.env
+device_one.txt
+devices.txt
+*.log
