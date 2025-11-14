@@ -1,0 +1,46 @@
+<!-- templates/device_backups.html -->
+{% extends "base.html" %}
+{% block title %}Backupy urządzenia {{ ip }}{% endblock %}
+
+{% block content %}
+<h2>Backupy urządzenia {{ ip }}</h2>
+
+<p>
+    <a class="btn" href="{{ url_for('index') }}">← Wróć do listy urządzeń</a>
+</p>
+
+{% if backups %}
+<table>
+    <thead>
+    <tr>
+        <th>Nazwa pliku</th>
+        <th>Sysname</th>
+        <th>Data utworzenia</th>
+        <th>Rozmiar [B]</th>
+        <th>Akcje</th>
+    </tr>
+    </thead>
+    <tbody>
+    {% for b in backups %}
+    <tr>
+        <td>{{ b.filename }}</td>
+        <td>{{ b.sysname or "-" }}</td>
+        <td>{{ b.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
+        <td>{{ b.size_bytes }}</td>
+        <td>
+            <a class="btn" href="{{ url_for('view_backup', filename=b.filename) }}">Podgląd</a>
+            <a class="btn" href="{{ url_for('download_backup', filename=b.filename) }}">Pobierz</a>
+            <form class="inline" method="post" action="{{ url_for('delete_backup', filename=b.filename) }}"
+                  onsubmit="return confirm('Na pewno usunąć ten backup?');">
+                <button type="submit" class="btn btn-danger">Usuń</button>
+            </form>
+        </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>Brak backupów dla tego urządzenia.</p>
+{% endif %}
+
+{% endblock %}

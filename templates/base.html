@@ -1,0 +1,82 @@
+<!-- templates/base.html -->
+<!doctype html>
+<html lang="pl" data-theme="light">
+<head>
+    <meta charset="utf-8">
+    <title>{% block title %}OLT Backup{% endblock %}</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+    <script>
+        // Ustawiamy motyw zanim załaduje się reszta strony
+        (function () {
+            var saved = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-theme', saved);
+        })();
+    </script>
+
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+<header>
+    <div class="header-inner">
+        <div>
+            <h1>OLT Backup – panel Web</h1>
+            <nav>
+                <a href="{{ url_for('index') }}">Strona główna</a>
+                &nbsp;|&nbsp;
+                <a href="{{ url_for('show_latest_backups') }}">Ostatnie backupy</a>
+            </nav>
+        </div>
+        <button id="theme-toggle" class="btn small" type="button" title="Przełącz motyw">
+            <span id="theme-icon">🌙</span>
+        </button>
+    </div>
+</header>
+
+<div class="messages">
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        {% for message in messages %}
+          <div class="msg">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+</div>
+
+{% block content %}{% endblock %}
+
+<script>
+    // Logika przełącznika jasny/ciemny z ikonkami ☀️ / 🌙
+    document.addEventListener('DOMContentLoaded', function () {
+        var btn = document.getElementById('theme-toggle');
+        var icon = document.getElementById('theme-icon');
+        if (!btn || !icon) return;
+
+        function updateIcon() {
+            var theme = document.documentElement.getAttribute('data-theme') || 'light';
+            if (theme === 'light') {
+                // Jesteśmy w trybie jasnym – pokaż księżyc (przełącz na ciemny)
+                icon.textContent = '🌙';
+                btn.title = 'Przełącz na tryb ciemny';
+            } else {
+                // Jesteśmy w trybie ciemnym – pokaż słońce (przełącz na jasny)
+                icon.textContent = '☀️';
+                btn.title = 'Przełącz na tryb jasny';
+            }
+        }
+
+        updateIcon();
+
+        btn.addEventListener('click', function () {
+            var current = document.documentElement.getAttribute('data-theme') || 'light';
+            var next = (current === 'light') ? 'dark' : 'light';
+            document.documentElement.setAttribute('data-theme', next);
+            localStorage.setItem('theme', next);
+            updateIcon();
+        });
+    });
+</script>
+
+</body>
+</html>

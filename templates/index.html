@@ -1,0 +1,119 @@
+<!-- templates/index.html -->
+{% extends "base.html" %}
+{% block title %}OLT Backup – urządzenia{% endblock %}
+
+{% block extra_head %}
+    {% if has_running %}
+        <!-- Jeśli jakiś backup jest w toku, odświeżaj stronę co 5 sekund -->
+        <meta http-equiv="refresh" content="5">
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+<h2>Lista urządzeń</h2>
+
+{% if devices %}
+
+<!-- PRZYCISKI W JEDNEJ LINII -->
+<div class="button-bar">
+    <!-- Backup wszystkich urządzeń -->
+    <form method="post" action="{{ url_for('backup_all') }}" class="inline">
+        <button type="submit" class="btn btn-primary">Backup wszystkich urządzeń</button>
+    </form>
+
+    <!-- Backup wybranych (przycisk powiązany z formularzem niżej) -->
+    <button type="submit" class="btn btn-primary" form="backup-selected-form">
+        Backup wybranych (zaznacz poniżej)
+    </button>
+
+    <!-- Ostatnie backupy -->
+    <a class="btn" href="{{ url_for('show_latest_backups') }}">Ostatnie backupy</a>
+</div>
+
+<!-- FORMULARZ DLA BACKUPU WYBRANYCH (checkboxy + tabela) -->
+<form method="post" action="{{ url_for('backup_selected') }}" id="backup-selected-form">
+    <table>
+        <thead>
+        <tr>
+            <th>Wybierz</th>
+            <th>Adres IP / sysname</th>
+            <th>Ostatni backup</th>
+            <th>Status</th>
+            <th>Backupy</th>
+            <th>Logi</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for d in devices %}
+        <tr>
+            <td><input type="checkbox" name="device_ip" value="{{ d.ip }}"></td>
+            <td>
+                {{ d.ip }}
+                {% if d.sysname %}
+                    ({{ d.sysname }})
+                {% endif %}
+            </td>
+            <td>
+                {% if d.last_backup %}
+                    {{ d.last_backup.strftime("%Y-%m-%d %H:%M") }}
+                {% else %}
+                    -
+                {% endif %}
+            </td>
+            <td class="status-cell">
+                {% if d.status == 'running' %}
+                    <span class="status-running" title="Backup w toku">⏳</span>
+                {% elif d.status == 'success' %}
+                    <span class="status-ok" title="Ostatni backup zakończony sukcesem">✅</span>
+                {% else %}
+                    <span class="status-fail" title="Brak backupu lub ostatni backup zakończony błędem">❌</span>
+                {% endif %}
+            </td>
+            <td>
+                <a class="btn" href="{{ url_for('device_backups', ip=d.ip) }}">Pokaż backupy</a>
+            </td>
+            <td>
+                <a class="btn" href="{{ url_for('device_logs', ip=d.ip) }}">Logi</a>
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</form>
+
+{% else %}
+<p>Brak urządzeń w pliku z listą IP. Sprawdź konfigurację pliku z urządzeniami (zmienna <code>DEVICES_FILE</code>).</p>
+{% endif %}
+
+<div class="schedule-box">
+    <h2>Automatyczny backup (CRON / harmonogram)</h2>
+    <form method="post" action="{{ url_for('update_schedule') }}">
+        <p>
+            <label>
+                <input type="checkbox" name="enabled" {% if schedule.enabled %}checked{% endif %}>
+                Włącz automatyczny backup raz dziennie
+            </label>
+        </p>
+        <p>
+            Godzina uruchomienia (czas lokalny kontenera/serwera):<br>
+            <input type="number" name="hour" min="0" max="23" value="{{ schedule.hour }}"> :
+            <input type="number" name="minute" min="0" max="59" value="{{ schedule.minute }}">
+        </p>
+        <p>
+            Ostatnie wykonanie (wg zapisanej informacji):
+            {% if schedule.last_run_date %}
+                {{ schedule.last_run_date }}
+            {% else %}
+                brak
+            {% endif %}
+        </p>
+        <button type="submit" class="btn btn-primary">Zapisz harmonogram</button>
+    </form>
+
+    <p style="margin-top: 10px; font-size: 13px;">
+        Uwaga: aby harmonogram działał, musisz uruchamiać skrypt
+        <code>cron_worker.py</code> z CRONA (np. co 5–10 minut).<br>
+        Skrypt sam sprawdzi, czy to już pora na dzisiejszy backup.
+    </p>
+</div>
+{% endblock %}

@@ -1,0 +1,57 @@
+<!-- templates/device_logs.html -->
+{% extends "base.html" %}
+{% block title %}Logi urządzenia {{ ip }}{% endblock %}
+
+{% block content %}
+<h2>Logi urządzenia {{ ip }}</h2>
+
+<p>
+    <a class="btn" href="javascript:history.back()">← Wróć</a>
+</p>
+
+<p>
+    <strong>Ostatni wynik backupu:</strong>
+    {% if state.last_result == 'never' %}
+        brak informacji (backup jeszcze nie był uruchamiany)
+    {% elif state.last_result == 'running' %}
+        backup w trakcie (status: running)
+    {% elif state.last_result == 'success' %}
+        sukces
+    {% elif state.last_result == 'error' %}
+        błąd
+    {% else %}
+        {{ state.last_result }}
+    {% endif %}
+</p>
+
+<p>
+    <strong>Ostatnie uruchomienie:</strong>
+    {% if state.last_run %}
+        {{ state.last_run }}
+    {% else %}
+        brak danych
+    {% endif %}
+</p>
+
+<p>
+    <strong>Ostatni błąd:</strong>
+    {% if state.last_error %}
+        {{ state.last_error }}
+    {% else %}
+        brak
+    {% endif %}
+</p>
+
+<h3>Fragment logów (ostatnie linie zawierające {{ ip }})</h3>
+
+{% if log_lines %}
+<pre style="border:1px solid #ccc; padding:10px; max-height:70vh; overflow:auto; white-space:pre;">
+{% for line in log_lines %}
+{{ line }}
+{% endfor %}
+</pre>
+{% else %}
+<p>Brak logów zawierających ten adres IP.</p>
+{% endif %}
+
+{% endblock %}

@@ -1,121 +1,170 @@
+# device.py
 import time
+from datetime import datetime
+from pathlib import Path
+from typing import Optional
+
 import paramiko
+
 from text_processing import process_text
 from logger_conf import logger
 
 
 class Device:
-    def __init__(self, ip, username, password, commands):
-        # Inicjalizacja urządzenia z adresem IP, danymi logowania oraz listą komend
+    """
+    Reprezentuje pojedyncze urządzenie (np. OLT), z którym łączymy się po SSH
+    i wykonujemy zestaw komend backupowych.
+    """
+
+    def __init__(self, ip: str, username: str, password: str, commands, backup_dir: str) -> None:
         self.ip = ip
         self.username = username
         self.password = password
-        self.commands = commands           # Lista komend do wykonania (np. [command_1, command_2, ...])
-        self.outputs = {}                  # Słownik przechowujący wyniki dla każdej komendy (klucze: 1, 2, ..., 5)
-        self.client = None                 # Obiekt SSHClient z biblioteki paramiko (połączenie SSH)
-        self.channel = None                # Kanał komunikacyjny SSH
-        self.sysname = ""                  # Nazwa systemu pobrana z wyniku komendy 4
+        self.commands = commands
+        self.backup_dir = Path(backup_dir)
 
+        self.outputs = {}          # type: dict[int, str]
+        self.client: Optional[paramiko.SSHClient] = None
+        self.channel = None
+        self.sysname: str = ""
 
-    def connect(self):
-        # Nawiązywanie połączenia SSH z urządzeniem
+    def connect(self) -> None:
         logger.info(f"Łączenie z urządzeniem: {self.ip} jako użytkownik {self.username}")
         self.client = paramiko.SSHClient()
-        self.client.set_missing_host_key_policy(paramiko.AutoAddPolicy())  # Automatyczne zatwierdzanie nieznanych kluczy
+        self.client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         self.client.load_system_host_keys()
-        # Próba połączenia z urządzeniem przy użyciu podanych danych logowania
         self.client.connect(
             self.ip,
             username=self.username,
             password=self.password,
             timeout=10,
             allow_agent=False,
-            look_for_keys=False
+            look_for_keys=False,
         )
-        # Otwarcie interaktywnego kanału SSH
         self.channel = self.client.invoke_shell()
-        time.sleep(1)  # Odczekanie, aż kanał będzie gotowy do komunikacji
+        time.sleep(1)
 
+    def execute_command(self, command: str) -> str:
+        """
+        Wykonuje pojedynczą komendę na urządzeniu przez kanał SSH
+        i zwraca surowy tekst wyjściowy (bez przetwarzania).
+        """
+        if not command:
+            logger.warning(f"{self.ip}: pusta komenda – pomijam.")
+            return ""
 
-    def execute_command(self, command):
-        # Wykonuje pojedynczą komendę na urządzeniu przez kanał SSH
-        logger.debug(f"Wykonuję komendę: {command}")
-        self.channel.send(command + "\n")  # Wysłanie komendy wraz z zakończeniem linii
-        time.sleep(1)                      # Krótkie opóźnienie przed kolejnym wysłaniem
-        self.channel.send("\n")            # Wysłanie pustej linii (symulacja naciśnięcia ENTER)
-        time.sleep(1)                      # Odczekanie na przetworzenie komendy
+        logger.debug(f"{self.ip}: wykonuję komendę: {command}")
+        self.channel.send(command + "\n")
+        time.sleep(1)
+        self.channel.send("\n")
+        time.sleep(1)
+
         output = ""
-        # Odbieranie danych z kanału aż do momentu, gdy nie pojawią się kolejne dane
         while True:
             if self.channel.recv_ready():
-                # Pobieranie danych w porcjach
                 chunk = self.channel.recv(1024).decode()
                 output += chunk
             else:
-                time.sleep(3)  # Opóźnienie przed kolejną próbą odbioru danych
+                time.sleep(3)
                 if not self.channel.recv_ready():
                     break
         return output
 
-    def run_commands(self):
-        # Wykonanie wszystkich komend sekwencyjnie oraz przetwarzanie wyników
+    def run_commands(self) -> None:
+        """
+        Wykonuje wszystkie komendy z listy self.commands i zapisuje
+        przetworzone wyniki w self.outputs.
+        """
         for i, cmd in enumerate(self.commands, start=1):
-            raw_output = self.execute_command(cmd)      # Wykonanie komendy i pobranie surowego outputu
-            processed_output = process_text(raw_output)   # Przetwarzanie wyniku (oczyszczenie, formatowanie)
-            self.outputs[i] = processed_output            # Zapis przetworzonego wyniku do słownika
+            raw_output = self.execute_command(cmd)
+            processed_output = process_text(raw_output)
+            self.outputs[i] = processed_output
 
-        # Wyodrębnienie wartości sysname z wyniku komendy 4
+        # Wyodrębnienie sysname – najpierw próbujemy z wyniku komendy 4
+        sysname_candidate = ""
+
         if 4 in self.outputs:
-            for line in self.outputs[4].splitlines():
-                if "sysname" in line:
-                    # Zakładamy, że linia ma format "sysname: nazwa" lub "sysname nazwa"
-                    parts = line.split("sysname", 1)[1].strip(" :")
-                    if parts:
-                        self.sysname = parts.split()[0]
+            sysname_candidate = self._extract_sysname_from_text(self.outputs[4])
+
+        # Jeśli się nie udało, szukamy w pozostałych outputach
+        if not sysname_candidate:
+            for idx, text in self.outputs.items():
+                if idx == 4:
+                    continue
+                sysname_candidate = self._extract_sysname_from_text(text)
+                if sysname_candidate:
                     break
 
-    def save_output(self):
-        # Ustalanie nazwy pliku wyjściowego na podstawie adresu IP oraz sysname (jeśli jest dostępny)
-        if self.sysname:
-            file_name = f"{self.ip}_{self.sysname}.log"
-        else:
-            file_name = f"{self.ip}.log"
+        self.sysname = sysname_candidate or ""
 
-        # Pobranie wyniku komendy 4 z przechowywanych outputów
-        output = self.outputs.get(4, '')
-        # Podzielenie tekstu na linie i usunięcie pierwszych trzech linii
+    @staticmethod
+    def _extract_sysname_from_text(text: str) -> str:
+        """
+        Pomocnicza metoda do wyszukiwania 'sysname' w tekście.
+        Zakładamy linie w stylu:
+          'sysname: OLT-SITE-1' lub 'sysname OLT-SITE-1'
+        """
+        for line in text.splitlines():
+            if "sysname" in line:
+                parts = line.split("sysname", 1)[1].strip(" :")
+                if parts:
+                    return parts.split()[0]
+        return ""
+
+    def save_output(self) -> str:
+        """
+        Zapisuje wynik komendy nr 4 (po przetworzeniu) do pliku w katalogu backupów.
+        Nazwa pliku:
+          IP_SYSNAME_DDMMYY_HHMM
+
+        np.:
+          [IP-REMOVED]_OLT-SITE-1_141125_0913
+
+        Zwraca pełną ścieżkę do utworzonego pliku.
+        """
+        self.backup_dir.mkdir(parents=True, exist_ok=True)
+
+        if self.sysname:
+            base_name = f"{self.ip}_{self.sysname}"
+        else:
+            base_name = self.ip
+
+        timestamp = datetime.now().strftime("%d%m%y_%H%M")
+        file_name = f"{base_name}_{timestamp}"
+        file_path = self.backup_dir / file_name
+
+        output = self.outputs.get(4, "")
         lines = output.splitlines()
         output_without_first_three = "\n".join(lines[3:]) if len(lines) >= 3 else ""
 
-        # Zapis przetworzonego outputu do pliku
-        with open(file_name, "w", encoding="utf-8") as f:
+        with file_path.open("w", encoding="utf-8") as f:
             f.write(output_without_first_three)
-        logger.info(f"Zapisano output komendy 4 do pliku: {file_name}")
 
-    def log_outputs(self):
-        # Logowanie wyników dla każdej z komend
-        for i in range(1, 6):
-            output = self.outputs.get(i, "")
-            logger.info(f"Output for command {i}:\n{output}")
+        logger.info(f"Zapisano backup do pliku: {file_path}")
+        return str(file_path)
 
-    def disconnect(self):
-        # Rozłączenie SSH, jeśli klient został utworzony
+    def disconnect(self) -> None:
         if self.client:
             self.client.close()
             logger.info(f"Połączenie z {self.ip} zakończone")
 
-    def process_device(self):
-        # Kompleksowy proces urządzenia:
-        # 1. Łączenie się
-        # 2. Wykonywanie komend i przetwarzanie wyników
-        # 3. Zapis wyniku do pliku
-        # 4. Rozłączanie się (nawet przy błędzie)
+    def process_device(self) -> Optional[str]:
+        """
+        Pełny proces:
+          1. Połączenie
+          2. Wykonanie komend i przetworzenie wyników
+          3. Zapis backupu do pliku
+          4. Rozłączenie
+
+        Zwraca ścieżkę do pliku backupu lub None w razie błędu.
+        """
+        backup_path: Optional[str] = None
         try:
             self.connect()
             self.run_commands()
-            self.save_output()
-            # self.log_outputs()  # Opcjonalne logowanie wszystkich wyników komend
+            backup_path = self.save_output()
         except Exception as e:
-            logger.error(f"Błąd przy łączeniu z {self.ip}: {e}")
+            logger.error(f"Błąd przy przetwarzaniu urządzenia {self.ip}: {e}")
         finally:
             self.disconnect()
+        return backup_path

@@ -1,0 +1,200 @@
+/* Motywy: jasny / ciemny poprzez data-theme na <html> */
+
+:root {
+    --bg-color: #ffffff;
+    --text-color: #000000;
+    --header-bg: #f9f9f9;
+    --header-border: #dddddd;
+    --table-border: #cccccc;
+    --table-header-bg: #f0f0f0;
+    --msg-bg: #e0ffe0;
+
+    --btn-bg: #f5f5f5;
+    --btn-text: #000000;
+    --btn-border: #444444;
+
+    --btn-primary-bg: #007bff;
+    --btn-primary-text: #ffffff;
+    --btn-primary-border: #007bff;
+
+    --btn-danger-bg: #dc3545;
+    --btn-danger-text: #ffffff;
+    --btn-danger-border: #dc3545;
+}
+
+[data-theme="dark"] {
+    --bg-color: #121212;
+    --text-color: #f5f5f5;
+    --header-bg: #1f1f1f;
+    --header-border: #333333;
+    --table-border: #444444;
+    --table-header-bg: #222222;
+    --msg-bg: #1f3d1f;
+
+    --btn-bg: #333333;
+    --btn-text: #f5f5f5;
+    --btn-border: #888888;
+
+    --btn-primary-bg: #0d6efd;
+    --btn-primary-text: #ffffff;
+    --btn-primary-border: #0d6efd;
+
+    --btn-danger-bg: #c82333;
+    --btn-danger-text: #ffffff;
+    --btn-danger-border: #c82333;
+}
+
+/* Ogólny layout */
+
+body {
+    font-family: Arial, sans-serif;
+    margin: 20px;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+}
+
+header {
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--header-border);
+    background-color: var(--header-bg);
+}
+
+.header-inner {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+header h1 {
+    margin: 0 0 5px 0;
+    font-size: 22px;
+}
+
+nav a {
+    text-decoration: none;
+    color: inherit;
+    font-size: 14px;
+    border-bottom: 1px dotted;
+}
+
+nav a:hover {
+    border-bottom-style: solid;
+}
+
+/* Komunikaty */
+
+.messages {
+    margin-bottom: 15px;
+}
+
+.messages .msg {
+    padding: 8px 12px;
+    border-radius: 4px;
+    background: var(--msg-bg);
+    margin-bottom: 5px;
+}
+
+/* Tabele */
+
+table {
+    border-collapse: collapse;
+    width: 100%;
+    margin-top: 10px;
+}
+
+th, td {
+    border: 1px solid var(--table-border);
+    padding: 6px 8px;
+    text-align: left;
+}
+
+th {
+    background: var(--table-header-bg);
+}
+
+/* Przyciski */
+
+.btn {
+    display: inline-block;
+    padding: 6px 10px;
+    border-radius: 4px;
+    border: 1px solid var(--btn-border);
+    text-decoration: none;
+    font-size: 14px;
+    background: var(--btn-bg);
+    color: var(--btn-text);
+    cursor: pointer;
+}
+
+.btn-primary {
+    background: var(--btn-primary-bg);
+    color: var(--btn-primary-text);
+    border-color: var(--btn-primary-border);
+}
+
+.btn-danger {
+    background: var(--btn-danger-bg);
+    color: var(--btn-danger-text);
+    border-color: var(--btn-danger-border);
+}
+
+.btn + .btn {
+    margin-left: 5px;
+}
+
+.btn.small {
+    font-size: 12px;
+    padding: 4px 8px;
+}
+
+/* Formularze */
+
+form.inline {
+    display: inline;
+}
+
+/* Box harmonogramu */
+
+.schedule-box {
+    margin-top: 30px;
+    padding: 10px;
+    border: 1px solid var(--table-border);
+    border-radius: 4px;
+}
+
+.schedule-box h2 {
+    margin-top: 0;
+}
+
+/* Status backupu: zielony ptaszek / czerwony krzyżyk / żółta klepsydra */
+
+.status-cell {
+    text-align: center;
+}
+
+.status-ok {
+    color: #28a745; /* zielony */
+    font-size: 18px;
+}
+
+.status-fail {
+    color: #dc3545; /* czerwony */
+    font-size: 18px;
+}
+
+.status-running {
+    color: #ffc107; /* żółty */
+    font-size: 18px;
+}
+
+/* Pasek przycisków nad tabelą */
+
+.button-bar {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
