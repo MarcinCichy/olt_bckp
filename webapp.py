@@ -93,10 +93,6 @@ def backup_all():
         flash("Brak urządzeń w pliku. Nie można uruchomić backupu.")
         return redirect(url_for("index"))
 
-    now_str = datetime.now().isoformat(timespec="seconds")
-    for ip in ips:
-        backup_service.status_repo.set_running(ip, now_str)
-
     _run_backup_async(ips)
 
     flash("Backup wszystkich urządzeń został uruchomiony w tle.")
@@ -110,13 +106,21 @@ def backup_selected():
         flash("Nie wybrano żadnego urządzenia.")
         return redirect(url_for("index"))
 
-    now_str = datetime.now().isoformat(timespec="seconds")
-    for ip in ips:
-        backup_service.status_repo.set_running(ip, now_str)
-
     _run_backup_async(ips)
 
     flash("Backup wybranych urządzeń został uruchomiony w tle.")
+    return redirect(url_for("index"))
+
+
+@app.route("/backup/cancel", methods=["POST"])
+def backup_cancel():
+    """
+    Endpoint wywoływany z przycisku „Zatrzymaj aktualny backup”.
+    Ustawia flagę anulowania w BackupService.
+    """
+    backup_service.request_cancel()
+    flash("Wysłano żądanie zatrzymania aktualnie trwającego backupu. "
+          "Obecne urządzenie może jeszcze dokończyć, pozostałe nie zostaną uruchomione.")
     return redirect(url_for("index"))
 
 

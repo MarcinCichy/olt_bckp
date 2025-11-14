@@ -65,6 +65,24 @@ class BackupService:
         self.storage = BackupStorage(self.backup_dir)
         self.status_repo = BackupStatusRepository(config.BACKUP_STATUS_FILE)
 
+        # flaga do anulowania aktualnie wykonywanego backupu
+        self._cancel_requested: bool = False
+
+    # === API do anulowania zadań ===
+
+    def request_cancel(self) -> None:
+        """
+        Zgłasza żądanie przerwania aktualnie trwającego backupu.
+
+        Uwaga: realnie przerwanie następuje dopiero po zakończeniu
+        backupu bieżącego urządzenia – kolejne urządzenia nie są już
+        uruchamiane.
+        """
+        self._cancel_requested = True
+        logger.info("Otrzymano żądanie anulowania backupu (request_cancel).")
+
+    # === wewnętrzne rzeczy ===
+
     def _load_devices(self) -> List[str]:
         path = Path(self.devices_file)
         if not path.is_file():
@@ -103,9 +121,7 @@ class BackupService:
             status = state.last_result
             last_error = state.last_error
 
-            # --- AUTO-TIMEOUT dla "running" ---
-            # Jeśli status "running" utrzymuje się dłużej niż 10 minut,
-            # wyświetlamy go jako błąd (na poziomie widoku).
+            # --- AUTO-TIMEOUT dla "running" (np. zawieszony backup) ---
             if status == "running" and state.last_run:
                 try:
                     last_run_dt = datetime.fromisoformat(state.last_run)
@@ -114,7 +130,7 @@ class BackupService:
                         if not last_error:
                             last_error = "Timeout backupu (running > 10 min)"
                 except ValueError:
-                    # Jeśli data ma zły format – ignorujemy i zostawiamy oryginalny status
+                    # zły format daty – ignorujemy
                     pass
 
             # Jeśli nie mamy statusu, ale istnieje backup, to traktujemy jak sukces
@@ -161,58 +177,86 @@ class BackupService:
     def backup_devices(self, ips: List[str]) -> List[BackupResult]:
         """
         Backup tylko wybranych urządzeń (lista IP).
+
+        UWAGA: funkcja respektuje flagę self._cancel_requested.
+        Jeśli z UI zostanie wywołane request_cancel(), to po zakończeniu
+        aktualnie wykonywanego urządzenia pętla zostanie przerwana,
+        a pozostałe IP oznaczone jako "error – anulowano".
         """
         results: List[BackupResult] = []
 
-        for ip in ips:
-            logger.info(f"Rozpoczynam backup urządzenia {ip}")
-            device = Device(
-                ip=ip,
-                username=self.username,
-                password=self.password,
-                commands=self.commands,
-                backup_dir=self.backup_dir,
-            )
+        # Przy starcie nowego zadania upewniamy się, że flaga jest wyczyszczona
+        self._cancel_requested = False
+        try:
+            for index, ip in enumerate(ips):
+                # Czy użytkownik poprosił o przerwanie?
+                if self._cancel_requested:
+                    logger.info("Backup został przerwany na żądanie użytkownika.")
+                    cancel_msg = "Backup anulowany przez użytkownika."
+                    now_str = datetime.now().isoformat(timespec="seconds")
 
-            start_time = datetime.now()
-            self.status_repo.set_running(ip, start_time.isoformat(timespec="seconds"))
+                    # Wszystkie jeszcze nieprzetworzone IP (w tym bieżące)
+                    # oznaczamy jako błąd/anulowane.
+                    for j in range(index, len(ips)):
+                        ip_rest = ips[j]
+                        self.status_repo.set_error(ip_rest, now_str, cancel_msg)
 
-            try:
-                backup_path = device.process_device()
-                end_time = datetime.now()
+                    break  # kończymy pętlę
 
-                if backup_path:
-                    self.status_repo.set_success(ip, end_time.isoformat(timespec="seconds"))
-                    results.append(
-                        BackupResult(
-                            ip=ip,
-                            backup_path=backup_path,
-                            success=True,
+                logger.info(f"Rozpoczynam backup urządzenia {ip}")
+                device = Device(
+                    ip=ip,
+                    username=self.username,
+                    password=self.password,
+                    commands=self.commands,
+                    backup_dir=self.backup_dir,
+                )
+
+                start_time = datetime.now()
+                # status "running" dla tego konkretnego IP
+                self.status_repo.set_running(ip, start_time.isoformat(timespec="seconds"))
+
+                try:
+                    backup_path = device.process_device()
+                    end_time = datetime.now()
+
+                    if backup_path:
+                        self.status_repo.set_success(ip, end_time.isoformat(timespec="seconds"))
+                        results.append(
+                            BackupResult(
+                                ip=ip,
+                                backup_path=backup_path,
+                                success=True,
+                            )
                         )
-                    )
-                else:
-                    msg = "Backup nie został utworzony (brak ścieżki do pliku)."
-                    self.status_repo.set_error(ip, end_time.isoformat(timespec="seconds"), msg)
+                    else:
+                        msg = "Backup nie został utworzony (brak ścieżki do pliku)."
+                        self.status_repo.set_error(ip, end_time.isoformat(timespec="seconds"), msg)
+                        results.append(
+                            BackupResult(
+                                ip=ip,
+                                backup_path=None,
+                                success=False,
+                                error=msg,
+                            )
+                        )
+                except Exception as e:
+                    end_time = datetime.now()
+                    err_msg = str(e)
+                    self.status_repo.set_error(ip, end_time.isoformat(timespec="seconds"), err_msg)
+                    logger.error(f"Błąd podczas backupu urządzenia {ip}: {e}")
                     results.append(
                         BackupResult(
                             ip=ip,
                             backup_path=None,
                             success=False,
-                            error=msg,
+                            error=err_msg,
                         )
                     )
-            except Exception as e:
-                end_time = datetime.now()
-                err_msg = str(e)
-                self.status_repo.set_error(ip, end_time.isoformat(timespec="seconds"), err_msg)
-                logger.error(f"Błąd podczas backupu urządzenia {ip}: {e}")
-                results.append(
-                    BackupResult(
-                        ip=ip,
-                        backup_path=None,
-                        success=False,
-                        error=err_msg,
-                    )
-                )
+
+        finally:
+            # Po zakończeniu zadania (niezależnie czy normalnie, czy po anulowaniu)
+            # flaga jest z powrotem wyczyszczona.
+            self._cancel_requested = False
 
         return results

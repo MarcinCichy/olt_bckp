@@ -22,6 +22,14 @@
     </button>
 
     <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('show_latest_backups') }}">Ostatnie backupy</a>
+
+    {% if has_running %}
+    <form method="post" action="{{ url_for('backup_cancel') }}" class="inline">
+        <button type="submit" class="btn btn-warning btn-sm">
+            Zatrzymaj aktualny backup
+        </button>
+    </form>
+    {% endif %}
 </div>
 
 <form method="post" action="{{ url_for('backup_selected') }}" id="backup-selected-form">
