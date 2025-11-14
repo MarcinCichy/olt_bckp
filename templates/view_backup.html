@@ -3,19 +3,19 @@
 {% block title %}Podgląd backupu {{ filename }}{% endblock %}
 
 {% block content %}
-<h2>Podgląd backupu</h2>
+<h2 class="h5 mb-3">Podgląd backupu</h2>
 
-<p>
-    <a class="btn" href="javascript:history.back()">← Wróć</a>
+<p class="mb-2">
+    <a class="btn btn-link btn-sm text-light p-0" href="javascript:history.back()">← Wróć</a>
 </p>
 
 <p><strong>Plik:</strong> {{ filename }}</p>
 
-<pre style="border:1px solid #ccc; padding:10px; max-height:70vh; overflow:auto; white-space:pre;">
+<pre style="border:1px solid #555; padding:10px; max-height:70vh; overflow:auto; white-space:pre; background-color:#1e1e1e; color:#f1f1f1;">
 {{ content }}
 </pre>
 
-<p>
-    <a class="btn" href="{{ url_for('download_backup', filename=filename) }}">Pobierz ten plik</a>
+<p class="mt-2">
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('download_backup', filename=filename) }}">Pobierz ten plik</a>
 </p>
 {% endblock %}

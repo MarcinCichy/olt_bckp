@@ -3,10 +3,10 @@
 {% block title %}Logi urządzenia {{ ip }}{% endblock %}
 
 {% block content %}
-<h2>Logi urządzenia {{ ip }}</h2>
+<h2 class="h5 mb-3">Logi urządzenia {{ ip }}</h2>
 
-<p>
-    <a class="btn" href="javascript:history.back()">← Wróć</a>
+<p class="mb-2">
+    <a class="btn btn-link btn-sm text-light p-0" href="javascript:history.back()">← Wróć</a>
 </p>
 
 <p>
@@ -42,10 +42,10 @@
     {% endif %}
 </p>
 
-<h3>Fragment logów (ostatnie linie zawierające {{ ip }})</h3>
+<h3 class="h6 mt-3">Fragment logów (ostatnie linie zawierające {{ ip }})</h3>
 
 {% if log_lines %}
-<pre style="border:1px solid #ccc; padding:10px; max-height:70vh; overflow:auto; white-space:pre;">
+<pre style="border:1px solid #555; padding:10px; max-height:70vh; overflow:auto; white-space:pre; background-color:#1e1e1e; color:#f1f1f1;">
 {% for line in log_lines %}
 {{ line }}
 {% endfor %}

@@ -1,63 +1,68 @@
-<!-- templates/index.html -->
 {% extends "base.html" %}
 {% block title %}OLT Backup – urządzenia{% endblock %}
 
 {% block extra_head %}
     {% if has_running %}
-        <!-- Jeśli jakiś backup jest w toku, odświeżaj stronę co 5 sekund -->
         <meta http-equiv="refresh" content="5">
     {% endif %}
 {% endblock %}
 
 {% block content %}
-<h2>Lista urządzeń</h2>
+<h2 class="h5 mb-3">Lista urządzeń</h2>
 
 {% if devices %}
 
-<!-- PRZYCISKI W JEDNEJ LINII -->
 <div class="button-bar">
-    <!-- Backup wszystkich urządzeń -->
     <form method="post" action="{{ url_for('backup_all') }}" class="inline">
-        <button type="submit" class="btn btn-primary">Backup wszystkich urządzeń</button>
+        <button type="submit" class="btn btn-primary btn-sm">Backup wszystkich urządzeń</button>
     </form>
 
-    <!-- Backup wybranych (przycisk powiązany z formularzem niżej) -->
-    <button type="submit" class="btn btn-primary" form="backup-selected-form">
+    <button type="submit" class="btn btn-primary btn-sm" form="backup-selected-form">
         Backup wybranych (zaznacz poniżej)
     </button>
 
-    <!-- Ostatnie backupy -->
-    <a class="btn" href="{{ url_for('show_latest_backups') }}">Ostatnie backupy</a>
+    <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('show_latest_backups') }}">Ostatnie backupy</a>
 </div>
 
-<!-- FORMULARZ DLA BACKUPU WYBRANYCH (checkboxy + tabela) -->
 <form method="post" action="{{ url_for('backup_selected') }}" id="backup-selected-form">
-    <table>
+
+    <div class="mb-2">
+        <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="select-all">
+            <label class="form-check-label" for="select-all">
+                Zaznacz wszystkie
+            </label>
+        </div>
+    </div>
+
+    <table id="device-table" class="table table-sm table-striped table-hover align-middle">
         <thead>
         <tr>
-            <th>Wybierz</th>
+            <th style="width: 40px;">Wybierz</th>
             <th>Adres IP / sysname</th>
-            <th>Ostatni backup</th>
-            <th>Status</th>
-            <th>Backupy</th>
-            <th>Logi</th>
+            <th style="width: 160px;">Ostatni backup</th>
+            <th style="width: 80px;">Status</th>
+            <th style="width: 130px;">Backupy</th>
+            <th style="width: 90px;">Logi</th>
         </tr>
         </thead>
         <tbody>
         {% for d in devices %}
         <tr>
-            <td><input type="checkbox" name="device_ip" value="{{ d.ip }}"></td>
             <td>
-                {{ d.ip }}
+                <input type="checkbox" class="form-check-input" name="device_ip" value="{{ d.ip }}">
+            </td>
+            <td>
+                <span class="fw-semibold">{{ d.ip }}</span>
                 {% if d.sysname %}
-                    ({{ d.sysname }})
+                    <span class="text-muted">({{ d.sysname }})</span>
                 {% endif %}
             </td>
             <td>
                 {% if d.last_backup %}
                     {{ d.last_backup.strftime("%Y-%m-%d %H:%M") }}
                 {% else %}
-                    -
+                    <span class="text-muted">–</span>
                 {% endif %}
             </td>
             <td class="status-cell">
@@ -70,10 +75,10 @@
                 {% endif %}
             </td>
             <td>
-                <a class="btn" href="{{ url_for('device_backups', ip=d.ip) }}">Pokaż backupy</a>
+                <a class="btn btn-sm btn-secondary" href="{{ url_for('device_backups', ip=d.ip) }}">Pokaż backupy</a>
             </td>
             <td>
-                <a class="btn" href="{{ url_for('device_logs', ip=d.ip) }}">Logi</a>
+                <a class="btn btn-sm btn-secondary" href="{{ url_for('device_logs', ip=d.ip) }}">Logi</a>
             </td>
         </tr>
         {% endfor %}
@@ -85,35 +90,67 @@
 <p>Brak urządzeń w pliku z listą IP. Sprawdź konfigurację pliku z urządzeniami (zmienna <code>DEVICES_FILE</code>).</p>
 {% endif %}
 
-<div class="schedule-box">
-    <h2>Automatyczny backup (CRON / harmonogram)</h2>
-    <form method="post" action="{{ url_for('update_schedule') }}">
-        <p>
-            <label>
-                <input type="checkbox" name="enabled" {% if schedule.enabled %}checked{% endif %}>
-                Włącz automatyczny backup raz dziennie
-            </label>
-        </p>
-        <p>
-            Godzina uruchomienia (czas lokalny kontenera/serwera):<br>
-            <input type="number" name="hour" min="0" max="23" value="{{ schedule.hour }}"> :
-            <input type="number" name="minute" min="0" max="59" value="{{ schedule.minute }}">
-        </p>
-        <p>
-            Ostatnie wykonanie (wg zapisanej informacji):
-            {% if schedule.last_run_date %}
-                {{ schedule.last_run_date }}
-            {% else %}
-                brak
-            {% endif %}
-        </p>
-        <button type="submit" class="btn btn-primary">Zapisz harmonogram</button>
-    </form>
+<div class="card mt-4">
+    <div class="card-body">
+        <h2 class="h5 card-title">Automatyczny backup (CRON / harmonogram)</h2>
+        <form method="post" action="{{ url_for('update_schedule') }}">
+            <div class="mb-2">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="schedule-enabled" name="enabled"
+                           {% if schedule.enabled %}checked{% endif %}>
+                    <label class="form-check-label" for="schedule-enabled">
+                        Włącz automatyczny backup raz dziennie
+                    </label>
+                </div>
+            </div>
 
-    <p style="margin-top: 10px; font-size: 13px;">
-        Uwaga: aby harmonogram działał, musisz uruchamiać skrypt
-        <code>cron_worker.py</code> z CRONA (np. co 5–10 minut).<br>
-        Skrypt sam sprawdzi, czy to już pora na dzisiejszy backup.
-    </p>
+            <div class="mb-2">
+                <label class="form-label form-label-sm">Godzina uruchomienia (czas lokalny kontenera/serwera):</label>
+                <div class="d-flex align-items-center gap-1">
+                    <input type="number" name="hour" min="0" max="23" value="{{ schedule.hour }}"
+                           class="form-control form-control-sm" style="max-width: 70px;">
+                    <span>:</span>
+                    <input type="number" name="minute" min="0" max="59" value="{{ schedule.minute }}"
+                           class="form-control form-control-sm" style="max-width: 70px;">
+                </div>
+            </div>
+
+            <div class="mb-2">
+                <span class="form-label form-label-sm d-block">Ostatnie wykonanie (wg zapisanej informacji):</span>
+                {% if schedule.last_run_date %}
+                    <span>{{ schedule.last_run_date }}</span>
+                {% else %}
+                    <span class="text-muted">brak</span>
+                {% endif %}
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-sm mt-1">Zapisz harmonogram</button>
+        </form>
+
+        <p class="mt-2 mb-0" style="font-size: 0.8rem;">
+            Uwaga: aby harmonogram działał, musisz uruchamiać skrypt
+            <code>cron_worker.py</code> z CRONA (np. co 5–10 minut).<br>
+            Skrypt sam sprawdzi, czy to już pora na dzisiejszy backup.
+        </p>
+    </div>
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        var selectAll = document.getElementById('select-all');
+        var rows = Array.from(document.querySelectorAll('#device-table tbody tr'));
+
+        if (selectAll) {
+            selectAll.addEventListener('change', function () {
+                var checked = selectAll.checked;
+                rows.forEach(function (row) {
+                    var cb = row.querySelector('input[type="checkbox"][name="device_ip"]');
+                    if (cb) cb.checked = checked;
+                });
+            });
+        }
+    });
+</script>
 {% endblock %}

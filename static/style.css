@@ -1,200 +1,145 @@
-/* Motywy: jasny / ciemny poprzez data-theme na <html> */
-
 :root {
-    --bg-color: #ffffff;
-    --text-color: #000000;
-    --header-bg: #f9f9f9;
-    --header-border: #dddddd;
-    --table-border: #cccccc;
-    --table-header-bg: #f0f0f0;
-    --msg-bg: #e0ffe0;
-
-    --btn-bg: #f5f5f5;
-    --btn-text: #000000;
-    --btn-border: #444444;
-
-    --btn-primary-bg: #007bff;
-    --btn-primary-text: #ffffff;
-    --btn-primary-border: #007bff;
-
-    --btn-danger-bg: #dc3545;
-    --btn-danger-text: #ffffff;
-    --btn-danger-border: #dc3545;
+    --bg-color: #f8f9fa;
+    --text-color: #212529;
+    --header-bg: #ffffff;
+    --header-border: #dee2e6;
+    --card-bg: #ffffff;
+    --footer-bg: #ffffff;
 }
 
 [data-theme="dark"] {
-    --bg-color: #121212;
-    --text-color: #f5f5f5;
-    --header-bg: #1f1f1f;
-    --header-border: #333333;
-    --table-border: #444444;
-    --table-header-bg: #222222;
-    --msg-bg: #1f3d1f;
-
-    --btn-bg: #333333;
-    --btn-text: #f5f5f5;
-    --btn-border: #888888;
-
-    --btn-primary-bg: #0d6efd;
-    --btn-primary-text: #ffffff;
-    --btn-primary-border: #0d6efd;
-
-    --btn-danger-bg: #c82333;
-    --btn-danger-text: #ffffff;
-    --btn-danger-border: #c82333;
+    /* ogólny ciemnoszary motyw */
+    --bg-color: #2f3437;
+    --text-color: #f1f1f1;
+    --header-bg: #383d40;
+    --header-border: #4a4f52;
+    --card-bg: #3c4145;
+    --footer-bg: #383d40;
 }
 
-/* Ogólny layout */
+/* ---------- layout podstawowy ---------- */
+
+html {
+    height: 100%; /* HTML nadal zajmuje 100% */
+}
 
 body {
-    font-family: Arial, sans-serif;
-    margin: 20px;
+    /* ZMIANA: Używamy min-height zamiast height */
+    /* Pozwala to body rosnąć wraz z zawartością */
+    min-height: 100%;
+    margin: 0;
+    /* padding: 0; - usunięte, bo jest niżej */
+
+    box-sizing: border-box;
     background-color: var(--bg-color);
     color: var(--text-color);
+    padding-top: 72px;
+    padding-bottom: 70px;/* Ten padding tworzy miejsce na stopkę */
 }
 
 header {
-    margin-bottom: 20px;
-    padding-bottom: 10px;
-    border-bottom: 1px solid var(--header-border);
     background-color: var(--header-bg);
+    border-bottom: 1px solid var(--header-border);
 }
 
-.header-inner {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 10px;
-}
-
-header h1 {
-    margin: 0 0 5px 0;
-    font-size: 22px;
-}
-
-nav a {
-    text-decoration: none;
+main.main-content {
     color: inherit;
-    font-size: 14px;
-    border-bottom: 1px dotted;
 }
 
-nav a:hover {
-    border-bottom-style: solid;
+/* karty */
+
+.card {
+    background-color: var(--card-bg);
+    color: var(--text-color);
+    border: 1px solid var(--header-border);
 }
 
-/* Komunikaty */
-
-.messages {
-    margin-bottom: 15px;
-}
-
-.messages .msg {
-    padding: 8px 12px;
-    border-radius: 4px;
-    background: var(--msg-bg);
-    margin-bottom: 5px;
-}
-
-/* Tabele */
+/* ---------- Tabele (GLOBALNIE) ---------- */
+/* DZIAŁA NA WSZYSTKIE <table> – główna lista i backupy */
 
 table {
-    border-collapse: collapse;
-    width: 100%;
-    margin-top: 10px;
+    background-color: var(--card-bg);
+    color: var(--text-color);
 }
 
-th, td {
-    border: 1px solid var(--table-border);
-    padding: 6px 8px;
-    text-align: left;
+/* DARK MODE – mocne nadpisanie bootstrapowych styli */
+
+[data-theme="dark"] table {
+    background-color: #3c4145 !important;
+    color: #f1f1f1 !important;
+    border-color: #555555 !important;
 }
 
-th {
-    background: var(--table-header-bg);
+[data-theme="dark"] table thead th {
+    background-color: #454a4e !important;
+    color: #f1f1f1 !important;
+    border-color: #555555 !important;
 }
 
-/* Przyciski */
-
-.btn {
-    display: inline-block;
-    padding: 6px 10px;
-    border-radius: 4px;
-    border: 1px solid var(--btn-border);
-    text-decoration: none;
-    font-size: 14px;
-    background: var(--btn-bg);
-    color: var(--btn-text);
-    cursor: pointer;
+[data-theme="dark"] table tbody tr {
+    background-color: #3c4145 !important;
+    color: #f1f1f1 !important;
 }
 
-.btn-primary {
-    background: var(--btn-primary-bg);
-    color: var(--btn-primary-text);
-    border-color: var(--btn-primary-border);
+[data-theme="dark"] table tbody tr:nth-of-type(odd) {
+    background-color: #44494d !important;
 }
 
-.btn-danger {
-    background: var(--btn-danger-bg);
-    color: var(--btn-danger-text);
-    border-color: var(--btn-danger-border);
+[data-theme="dark"] table tbody tr:nth-of-type(even) {
+    background-color: #353a3e !important;
 }
 
-.btn + .btn {
-    margin-left: 5px;
+[data-theme="dark"] table.table-hover tbody tr:hover {
+    background-color: #50565b !important;
 }
 
-.btn.small {
-    font-size: 12px;
-    padding: 4px 8px;
+/* ---------- Pasek przycisków ---------- */
+
+.button-bar {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
 }
 
-/* Formularze */
-
-form.inline {
-    display: inline;
-}
-
-/* Box harmonogramu */
-
-.schedule-box {
-    margin-top: 30px;
-    padding: 10px;
-    border: 1px solid var(--table-border);
-    border-radius: 4px;
-}
-
-.schedule-box h2 {
-    margin-top: 0;
-}
-
-/* Status backupu: zielony ptaszek / czerwony krzyżyk / żółta klepsydra */
+/* ---------- Statusy backupu – TYLKO KOLORY, ikony są w HTML ---------- */
 
 .status-cell {
     text-align: center;
 }
 
 .status-ok {
-    color: #28a745; /* zielony */
-    font-size: 18px;
+    color: #28a745;
+    font-size: 1.2rem;
 }
 
 .status-fail {
-    color: #dc3545; /* czerwony */
-    font-size: 18px;
+    color: #dc3545;
+    font-size: 1.2rem;
 }
 
 .status-running {
-    color: #ffc107; /* żółty */
-    font-size: 18px;
+    color: #ffc107;
+    font-size: 1.2rem;
 }
 
-/* Pasek przycisków nad tabelą */
+/* drobne */
 
-.button-bar {
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-    margin-bottom: 10px;
+.form-label-sm {
+    font-size: 0.85rem;
+    margin-bottom: 0.2rem;
+}
+
+.alert {
+    padding-top: 0.35rem;
+    padding-bottom: 0.35rem;
+}
+
+/* ---------- Stopka ---------- */
+
+.footer-bar {
+    background-color: var(--footer-bg);
+    border-top: 1px solid var(--header-border);
+    font-size: 0.85rem;
+    color: var(--text-color);
 }

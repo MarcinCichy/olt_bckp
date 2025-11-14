@@ -2,7 +2,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from logger_conf import logger
 from device import Device
@@ -102,6 +102,20 @@ class BackupService:
             state = self.status_repo.get_record(ip)
             status = state.last_result
             last_error = state.last_error
+
+            # --- AUTO-TIMEOUT dla "running" ---
+            # Jeśli status "running" utrzymuje się dłużej niż 10 minut,
+            # wyświetlamy go jako błąd (na poziomie widoku).
+            if status == "running" and state.last_run:
+                try:
+                    last_run_dt = datetime.fromisoformat(state.last_run)
+                    if datetime.now() - last_run_dt > timedelta(minutes=10):
+                        status = "error"
+                        if not last_error:
+                            last_error = "Timeout backupu (running > 10 min)"
+                except ValueError:
+                    # Jeśli data ma zły format – ignorujemy i zostawiamy oryginalny status
+                    pass
 
             # Jeśli nie mamy statusu, ale istnieje backup, to traktujemy jak sukces
             if status == "never" and has_backup:

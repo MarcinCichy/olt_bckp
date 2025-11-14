@@ -1,66 +1,79 @@
-<!-- templates/base.html -->
 <!doctype html>
 <html lang="pl" data-theme="light">
 <head>
     <meta charset="utf-8">
     <title>{% block title %}OLT Backup{% endblock %}</title>
 
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 
     <script>
-        // Ustawiamy motyw zanim załaduje się reszta strony
         (function () {
-            var saved = localStorage.getItem('theme') || 'light';
+            // DOMYŚLNIE: ciemny motyw, jeśli w localStorage nie ma wpisu
+            var saved = localStorage.getItem('theme') || 'dark';
             document.documentElement.setAttribute('data-theme', saved);
+            document.documentElement.setAttribute('data-bs-theme', saved);
         })();
     </script>
 
     {% block extra_head %}{% endblock %}
 </head>
 <body>
-<header>
-    <div class="header-inner">
-        <div>
-            <h1>OLT Backup – panel Web</h1>
-            <nav>
-                <a href="{{ url_for('index') }}">Strona główna</a>
-                &nbsp;|&nbsp;
-                <a href="{{ url_for('show_latest_backups') }}">Ostatnie backupy</a>
-            </nav>
+<header class="fixed-top">
+    <div class="container py-2">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+                <h1 class="h4 mb-1">OLT Backup – panel Web</h1>
+                <nav class="small">
+                    <a href="{{ url_for('index') }}" class="me-2">Strona główna</a>
+                    <span class="text-muted">|</span>
+                    <a href="{{ url_for('show_latest_backups') }}" class="ms-2">Ostatnie backupy</a>
+                </nav>
+            </div>
+            <button id="theme-toggle" class="btn btn-outline-secondary btn-sm" type="button" title="Przełącz motyw">
+                <span id="theme-icon">🌙</span>
+            </button>
         </div>
-        <button id="theme-toggle" class="btn small" type="button" title="Przełącz motyw">
-            <span id="theme-icon">🌙</span>
-        </button>
     </div>
 </header>
 
-<div class="messages">
+<main class="container my-3 main-content">
     {% with messages = get_flashed_messages() %}
       {% if messages %}
-        {% for message in messages %}
-          <div class="msg">{{ message }}</div>
-        {% endfor %}
+        <div class="mb-3">
+          {% for message in messages %}
+            <div class="alert alert-info mb-2" role="alert">
+              {{ message }}
+            </div>
+          {% endfor %}
+        </div>
       {% endif %}
     {% endwith %}
-</div>
 
-{% block content %}{% endblock %}
+    {% block content %}{% endblock %}
+</main>
+
+<footer class="footer-bar fixed-bottom">
+    <div class="container py-1 text-center">
+        © 2025 Created by Marcin Cichy
+    </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
-    // Logika przełącznika jasny/ciemny z ikonkami ☀️ / 🌙
     document.addEventListener('DOMContentLoaded', function () {
         var btn = document.getElementById('theme-toggle');
         var icon = document.getElementById('theme-icon');
         if (!btn || !icon) return;
 
         function updateIcon() {
-            var theme = document.documentElement.getAttribute('data-theme') || 'light';
+            var theme = document.documentElement.getAttribute('data-bs-theme') || 'dark';
             if (theme === 'light') {
-                // Jesteśmy w trybie jasnym – pokaż księżyc (przełącz na ciemny)
                 icon.textContent = '🌙';
                 btn.title = 'Przełącz na tryb ciemny';
             } else {
-                // Jesteśmy w trybie ciemnym – pokaż słońce (przełącz na jasny)
                 icon.textContent = '☀️';
                 btn.title = 'Przełącz na tryb jasny';
             }
@@ -69,14 +82,18 @@
         updateIcon();
 
         btn.addEventListener('click', function () {
-            var current = document.documentElement.getAttribute('data-theme') || 'light';
+            var current = document.documentElement.getAttribute('data-theme') || 'dark';
             var next = (current === 'light') ? 'dark' : 'light';
+
             document.documentElement.setAttribute('data-theme', next);
+            document.documentElement.setAttribute('data-bs-theme', next);
+
             localStorage.setItem('theme', next);
             updateIcon();
         });
     });
 </script>
 
+{% block extra_scripts %}{% endblock %}
 </body>
 </html>

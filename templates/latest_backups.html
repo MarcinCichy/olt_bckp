@@ -1,22 +1,21 @@
-<!-- templates/latest_backups.html -->
 {% extends "base.html" %}
 {% block title %}Ostatnie backupy{% endblock %}
 
 {% block content %}
-<h2>Ostatnie backupy urządzeń</h2>
+<h2 class="h5 mb-3">Ostatnie backupy urządzeń</h2>
 
-<p>
-    <a class="btn" href="{{ url_for('index') }}">← Wróć do listy urządzeń</a>
+<p class="mb-2">
+    <a class="btn btn-link btn-sm text-light p-0" href="{{ url_for('index') }}">← Wróć do listy urządzeń</a>
 </p>
 
 {% if backups %}
 <div class="button-bar">
-    <a class="btn btn-primary" href="{{ url_for('download_latest_backups_all') }}">
+    <a class="btn btn-primary btn-sm" href="{{ url_for('download_latest_backups_all') }}">
         Pobierz wszystkie ostatnie backupy (ZIP)
     </a>
 </div>
 
-<table>
+<table class="table table-sm table-striped table-hover align-middle olt-table">
     <thead>
     <tr>
         <th>Adres IP</th>
@@ -35,9 +34,13 @@
         <td>{{ b.filename }}</td>
         <td>{{ b.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
         <td>{{ b.size_bytes }}</td>
-        <td>
-            <a class="btn" href="{{ url_for('view_backup', filename=b.filename) }}">Podgląd</a>
-            <a class="btn" href="{{ url_for('download_backup', filename=b.filename) }}">Pobierz</a>
+        <td class="text-nowrap">
+            <div class="d-flex flex-row flex-wrap gap-2">
+                <a class="btn btn-sm btn-secondary"
+                   href="{{ url_for('view_backup', filename=b.filename) }}">Podgląd</a>
+                <a class="btn btn-sm btn-secondary"
+                   href="{{ url_for('download_backup', filename=b.filename) }}">Pobierz</a>
+            </div>
         </td>
     </tr>
     {% endfor %}
