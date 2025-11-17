@@ -2,8 +2,9 @@
 device_one.txt
 devices.txt
 *.log
-.idea\
+.idea/
 __pycache__
+__pycache/
 list.txt
-.venv\
-tests\
+.venv/
+tests/
