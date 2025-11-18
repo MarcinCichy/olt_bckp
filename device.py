@@ -102,7 +102,7 @@ class Device:
         """
         Pomocnicza metoda do wyszukiwania 'sysname' w tekście.
         Zakładamy linie w stylu:
-          'sysname: OLT-SITE-1' lub 'sysname OLT-SITE-1'
+          'sysname: OLT-COS-TAM' lub 'sysname OLT-COS-TAM'
         """
         for line in text.splitlines():
             if "sysname" in line:
@@ -116,9 +116,6 @@ class Device:
         Zapisuje wynik komendy nr 4 (po przetworzeniu) do pliku w katalogu backupów.
         Nazwa pliku:
           IP_SYSNAME_DDMMYY_HHMM
-
-        np.:
-          [IP-REMOVED]_OLT-SITE-1_141125_0913
 
         Zwraca pełną ścieżkę do utworzonego pliku.
         """
