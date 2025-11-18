@@ -8,3 +8,8 @@ __pycache/
 list.txt
 .venv/
 tests/
+backups/
+logs/
+backup_status.json
+backup_schedule.json
+versions.log
