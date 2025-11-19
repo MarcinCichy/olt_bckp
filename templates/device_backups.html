@@ -1,38 +1,47 @@
 {% extends "base.html" %}
-{% block title %}Backupy urządzenia {{ ip }}{% endblock %}
+{% block title %}Backupy urządzenia {{ device.ip }}{% endblock %}
 
 {% block content %}
-<h2 class="h5 mb-3">Backupy urządzenia {{ ip }}</h2>
+<h2 class="h5 mb-3">Lista plików backupu: {{ device.ip }}</h2>
 
 <p class="mb-2">
     <a class="btn btn-link btn-sm text-light p-0" href="{{ url_for('index') }}">← Wróć do listy urządzeń</a>
 </p>
 
-{% if backups %}
+{% if logs %}
 <table class="table table-sm table-striped table-hover align-middle olt-table">
     <thead>
     <tr>
         <th>Nazwa pliku</th>
-        <th>Sysname</th>
         <th>Data utworzenia</th>
-        <th>Rozmiar [B]</th>
+        <th>Rozmiar</th>
+        <th>Status</th>
         <th>Akcje</th>
     </tr>
     </thead>
     <tbody>
-    {% for b in backups %}
+    {% for log in logs %}
     <tr>
-        <td>{{ b.filename }}</td>
-        <td>{{ b.sysname or "-" }}</td>
-        <td>{{ b.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
-        <td>{{ b.size_bytes }}</td>
+        <td>{{ log.filename }}</td>
+        <td>{{ log.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
+        <td>{{ log.size_bytes }}</td>
+        <td>
+            {% if log.status == 'success' %}
+                <span class="text-success fw-bold">OK</span>
+            {% else %}
+                <span class="text-danger">Błąd</span>
+            {% endif %}
+        </td>
         <td class="text-nowrap">
             <div class="d-flex flex-row flex-wrap gap-2">
-                <a class="btn btn-sm btn-secondary"
-                   href="{{ url_for('view_backup', filename=b.filename) }}">Podgląd</a>
-                <a class="btn btn-sm btn-secondary"
-                   href="{{ url_for('download_backup', filename=b.filename) }}">Pobierz</a>
-                <form class="inline" method="post" action="{{ url_for('delete_backup', filename=b.filename) }}"
+                {% if log.status == 'success' %}
+                    <a class="btn btn-sm btn-secondary"
+                       href="{{ url_for('view_backup', log_id=log.id) }}">Podgląd</a>
+                    <a class="btn btn-sm btn-secondary"
+                       href="{{ url_for('download_backup', log_id=log.id) }}">Pobierz</a>
+                {% endif %}
+
+                <form class="inline" method="post" action="{{ url_for('delete_backup', log_id=log.id) }}"
                       onsubmit="return confirm('Na pewno usunąć ten backup?');">
                     <button type="submit" class="btn btn-sm btn-danger">Usuń</button>
                 </form>

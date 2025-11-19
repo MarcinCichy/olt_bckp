@@ -1,45 +1,61 @@
 :root {
-    --bg-color: #f8f9fa;
-    --text-color: #212529;
-    --header-bg: #ffffff;
-    --header-border: #dee2e6;
+    /* TRYB JASNY (ZMODYFIKOWANY - STONOWANY) */
+    /* Tło nie jest już czysto białe, ale jasnoszare (eye-comfort) */
+    --bg-color: #e3e6ec;
+
+    /* Tekst nie jest idealnie czarny (#000), tylko bardzo ciemnoszary (mniej kontrastowy) */
+    --text-color: #2c3e50;
+
+    /* Nagłówek lekko złamana biel */
+    --header-bg: #f8f9fa;
+    --header-border: #ced4da;
+
+    /* Karty pozostają białe, żeby odcinały się od tła */
     --card-bg: #ffffff;
-    --footer-bg: #ffffff;
+    --footer-bg: #f8f9fa;
+
+    /* Kolory tabel w trybie jasnym */
+    --table-bg: #ffffff;
+    --table-text: #212529;
+    --table-hover: #f1f3f5;
 }
 
 [data-theme="dark"] {
-    /* ogólny ciemnoszary motyw */
+    /* TRYB CIEMNY (BEZ ZMIAN) */
     --bg-color: #2f3437;
     --text-color: #f1f1f1;
     --header-bg: #383d40;
     --header-border: #4a4f52;
     --card-bg: #3c4145;
     --footer-bg: #383d40;
+
+    /* Kolory tabel w trybie ciemnym */
+    --table-bg: #3c4145;
+    --table-text: #f1f1f1;
+    --table-hover: #50565b;
 }
 
 /* ---------- layout podstawowy ---------- */
 
 html {
-    height: 100%; /* HTML nadal zajmuje 100% */
+    height: 100%;
 }
 
 body {
-    /* ZMIANA: Używamy min-height zamiast height */
-    /* Pozwala to body rosnąć wraz z zawartością */
     min-height: 100%;
     margin: 0;
-    /* padding: 0; - usunięte, bo jest niżej */
-
     box-sizing: border-box;
     background-color: var(--bg-color);
     color: var(--text-color);
     padding-top: 72px;
-    padding-bottom: 70px;/* Ten padding tworzy miejsce na stopkę */
+    padding-bottom: 70px;
+    transition: background-color 0.3s, color 0.3s; /* Płynne przejście motywu */
 }
 
 header {
     background-color: var(--header-bg);
     border-bottom: 1px solid var(--header-border);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05); /* Lekki cień pod nagłówkiem */
 }
 
 main.main-content {
@@ -52,44 +68,55 @@ main.main-content {
     background-color: var(--card-bg);
     color: var(--text-color);
     border: 1px solid var(--header-border);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05); /* Lekki cień dla kart */
+    border-radius: 0.5rem;
 }
 
 /* ---------- Tabele (GLOBALNIE) ---------- */
-/* DZIAŁA NA WSZYSTKIE <table> – główna lista i backupy */
 
-table {
-    background-color: var(--card-bg);
+table.olt-table {
+    background-color: var(--table-bg) !important;
+    color: var(--table-text) !important;
+}
+
+table.olt-table thead th {
+    /* W trybie jasnym nagłówek tabeli lekko szary */
+    background-color: var(--header-bg);
     color: var(--text-color);
 }
 
-/* DARK MODE – mocne nadpisanie bootstrapowych styli */
+table.olt-table tbody tr:hover {
+    background-color: var(--table-hover) !important;
+}
 
-[data-theme="dark"] table {
+/* DARK MODE – specyficzne nadpisania dla bootstrapowych tabel */
+
+[data-theme="dark"] table.olt-table {
     background-color: #3c4145 !important;
     color: #f1f1f1 !important;
     border-color: #555555 !important;
 }
 
-[data-theme="dark"] table thead th {
+[data-theme="dark"] table.olt-table thead th {
     background-color: #454a4e !important;
     color: #f1f1f1 !important;
     border-color: #555555 !important;
 }
 
-[data-theme="dark"] table tbody tr {
+[data-theme="dark"] table.olt-table tbody tr {
     background-color: #3c4145 !important;
     color: #f1f1f1 !important;
 }
 
-[data-theme="dark"] table tbody tr:nth-of-type(odd) {
+[data-theme="dark"] table.olt-table tbody tr:nth-of-type(odd) {
     background-color: #44494d !important;
 }
 
-[data-theme="dark"] table tbody tr:nth-of-type(even) {
+[data-theme="dark"] table.olt-table tbody tr:nth-of-type(even) {
     background-color: #353a3e !important;
 }
 
-[data-theme="dark"] table.table-hover tbody tr:hover {
+[data-theme="dark"] table.olt-table tbody tr:hover {
     background-color: #50565b !important;
 }
 
@@ -102,25 +129,23 @@ table {
     margin-bottom: 1rem;
 }
 
-/* ---------- Statusy backupu – TYLKO KOLORY, ikony są w HTML ---------- */
+/* ---------- Statusy backupu ---------- */
 
 .status-cell {
     text-align: center;
+    font-weight: bold;
 }
 
 .status-ok {
-    color: #28a745;
-    font-size: 1.2rem;
+    color: #198754; /* Bootstrap success darken */
 }
 
 .status-fail {
     color: #dc3545;
-    font-size: 1.2rem;
 }
 
 .status-running {
     color: #ffc107;
-    font-size: 1.2rem;
 }
 
 /* drobne */
@@ -133,6 +158,7 @@ table {
 .alert {
     padding-top: 0.35rem;
     padding-bottom: 0.35rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
 }
 
 /* ---------- Stopka ---------- */

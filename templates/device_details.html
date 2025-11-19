@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block title %}Szczegóły urządzenia {{ device.ip }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="h5 m-0">Panel urządzenia: <span class="font-monospace">{{ device.ip }}</span></h2>
+    <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('index') }}">← Wróć do listy</a>
+</div>
+
+<div class="card mb-4 border-secondary">
+    <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+        <span>Ostatni status operacji</span>
+        {% if device.sysname %}
+            <span class="badge bg-secondary">{{ device.sysname }}</span>
+        {% endif %}
+    </div>
+    <div class="card-body">
+        <div class="row text-center">
+            <div class="col-md-4 border-end border-secondary">
+                <small class="text-muted d-block mb-1">Wynik</small>
+                {% if device.last_status == 'success' %}
+                    <span class="text-success fs-4 fw-bold">✅ Sukces</span>
+                {% elif device.last_status == 'running' %}
+                    <span class="text-warning fs-4 fw-bold">⏳ W toku...</span>
+                {% elif device.last_status == 'error' %}
+                    <span class="text-danger fs-4 fw-bold">❌ Błąd</span>
+                {% else %}
+                    <span class="text-muted fs-4">-</span>
+                {% endif %}
+            </div>
+            <div class="col-md-4 border-end border-secondary">
+                <small class="text-muted d-block mb-1">Czas ostatniej akcji</small>
+                <span class="fs-5">
+                    {% if device.last_backup_time %}
+                        {{ device.last_backup_time.strftime('%Y-%m-%d %H:%M') }}
+                    {% else %}
+                        --
+                    {% endif %}
+                </span>
+            </div>
+            <div class="col-md-4">
+                <small class="text-muted d-block mb-1">Komunikat</small>
+                <span class="text-danger small">{{ device.last_error or "Brak błędów" }}</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<h3 class="h6 mb-2">Historia Backupów (Pliki)</h3>
+{% if db_logs %}
+<div class="table-responsive mb-4">
+    <table class="table table-sm table-striped table-hover align-middle olt-table">
+        <thead class="table-dark">
+            <tr>
+                <th>Data</th>
+                <th>Nazwa pliku</th>
+                <th>Status</th>
+                <th>Szyfr.</th>
+                <th>Rozmiar</th>
+                <th class="text-end">Akcje</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for log in db_logs %}
+            <tr>
+                <td>{{ log.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                <td class="font-monospace small">{{ log.filename }}</td>
+                <td>
+                    {% if log.status == 'success' %}
+                        <span class="badge bg-success">OK</span>
+                    {% else %}
+                        <span class="badge bg-danger">FAIL</span>
+                    {% endif %}
+                </td>
+                <td>{{ "🔒" if log.encrypted else "🔓" }}</td>
+                <td>{{ log.size_bytes }} B</td>
+
+                <td class="text-end">
+                    <div class="btn-group" role="group">
+                        {% if log.status == 'success' %}
+                            <a class="btn btn-sm btn-outline-primary"
+                               href="{{ url_for('view_backup', log_id=log.id) }}"
+                               title="Podgląd zawartości">👁️</a>
+                            <a class="btn btn-sm btn-outline-success"
+                               href="{{ url_for('download_backup', log_id=log.id) }}"
+                               title="Pobierz">💾</a>
+                        {% else %}
+                            <button class="btn btn-sm btn-outline-secondary" disabled>👁️</button>
+                            <button class="btn btn-sm btn-outline-secondary" disabled>💾</button>
+                        {% endif %}
+
+                        <form class="d-inline" method="post" action="{{ url_for('delete_backup', log_id=log.id) }}"
+                              onsubmit="return confirm('Na pewno usunąć?');" style="margin-left: -1px;">
+                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Usuń">🗑️</button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="alert alert-info">Brak zapisanych backupów w bazie.</div>
+{% endif %}
+
+<div class="card border-secondary mt-4">
+    <div class="card-header d-flex justify-content-between align-items-center"
+         data-bs-toggle="collapse" data-bs-target="#syslogs" style="cursor: pointer;">
+        <span>📋 Logi systemowe aplikacji (ostatnie operacje)</span>
+        <small class="text-muted">Kliknij, aby zwinąć/rozwinąć</small>
+    </div>
+    <div id="syslogs" class="collapse show">
+        <div class="card-body p-0">
+            {% if text_logs %}
+                <pre class="m-0 p-3" style="background-color: #1e1e1e; color: #00ff00; font-size: 0.85rem; max-height: 300px; overflow-y: auto;">
+{% for line in text_logs %}{{ line }}
+{% endfor %}</pre>
+            {% else %}
+                <div class="p-3 text-muted">Brak logów tekstowych dla tego adresu IP w pliku app.log.</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% endblock %}

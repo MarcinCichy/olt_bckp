@@ -1,57 +1,103 @@
-<!-- templates/device_logs.html -->
 {% extends "base.html" %}
-{% block title %}Logi urządzenia {{ ip }}{% endblock %}
+{% block title %}Logi urządzenia {{ device.ip }}{% endblock %}
 
 {% block content %}
-<h2 class="h5 mb-3">Logi urządzenia {{ ip }}</h2>
+<h2 class="h5 mb-3">Logi urządzenia: {{ device.ip }}</h2>
 
 <p class="mb-2">
-    <a class="btn btn-link btn-sm text-light p-0" href="javascript:history.back()">← Wróć</a>
+    <a class="btn btn-link btn-sm text-light p-0" href="{{ url_for('index') }}">← Wróć do listy urządzeń</a>
 </p>
 
-<p>
-    <strong>Ostatni wynik backupu:</strong>
-    {% if state.last_result == 'never' %}
-        brak informacji (backup jeszcze nie był uruchamiany)
-    {% elif state.last_result == 'running' %}
-        backup w trakcie (status: running)
-    {% elif state.last_result == 'success' %}
-        sukces
-    {% elif state.last_result == 'error' %}
-        błąd
-    {% else %}
-        {{ state.last_result }}
-    {% endif %}
-</p>
+<div class="card mb-4 border-secondary">
+    <div class="card-header">Aktualny status urządzenia</div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-4">
+                <strong>Ostatni wynik:</strong><br>
+                {% if device.last_status == 'success' %}
+                    <span class="text-success fs-5">✅ Sukces</span>
+                {% elif device.last_status == 'running' %}
+                    <span class="text-warning fs-5">⏳ W toku</span>
+                {% elif device.last_status == 'error' %}
+                    <span class="text-danger fs-5">❌ Błąd</span>
+                {% else %}
+                    <span class="text-muted">Brak danych</span>
+                {% endif %}
+            </div>
+            <div class="col-md-4">
+                <strong>Ostatni backup:</strong><br>
+                {% if device.last_backup_time %}
+                    {{ device.last_backup_time.strftime('%Y-%m-%d %H:%M') }}
+                {% else %}
+                    <span class="text-muted">nigdy</span>
+                {% endif %}
+            </div>
+            <div class="col-md-4">
+                <strong>Ostatni komunikat błędu:</strong><br>
+                {% if device.last_error %}
+                    <span class="text-danger">{{ device.last_error }}</span>
+                {% else %}
+                    <span class="text-muted">-</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
 
-<p>
-    <strong>Ostatnie uruchomienie:</strong>
-    {% if state.last_run %}
-        {{ state.last_run }}
-    {% else %}
-        brak danych
-    {% endif %}
-</p>
+<h3 class="h6 mt-3">Historia operacji</h3>
 
-<p>
-    <strong>Ostatni błąd:</strong>
-    {% if state.last_error %}
-        {{ state.last_error }}
-    {% else %}
-        brak
-    {% endif %}
-</p>
+{% if logs %}
+<table class="table table-sm table-striped table-hover align-middle olt-table">
+    <thead>
+        <tr>
+            <th>Data</th>
+            <th>Nazwa pliku</th>
+            <th>Status</th>
+            <th>Rozmiar</th>
+            <th>Szyfrowany</th>
+            <th>Akcje</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for log in logs %}
+        <tr>
+            <td>{{ log.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+            <td class="font-monospace small">{{ log.filename }}</td>
+            <td>
+                {% if log.status == 'success' %}
+                    <span class="badge bg-success">OK</span>
+                {% else %}
+                    <span class="badge bg-danger">BŁĄD</span>
+                {% endif %}
+            </td>
+            <td>{{ log.size_bytes }} B</td>
+            <td>{{ "🔒 Tak" if log.encrypted else "🔓 Nie" }}</td>
 
-<h3 class="h6 mt-3">Fragment logów (ostatnie linie zawierające {{ ip }})</h3>
+            <td class="text-nowrap">
+                <div class="d-flex flex-row gap-2">
+                    {% if log.status == 'success' %}
+                        <a class="btn btn-sm btn-outline-primary"
+                           href="{{ url_for('view_backup', log_id=log.id) }}"
+                           title="Podgląd">👁️</a>
+                        <a class="btn btn-sm btn-outline-success"
+                           href="{{ url_for('download_backup', log_id=log.id) }}"
+                           title="Pobierz">💾</a>
+                    {% else %}
+                        <span style="display:inline-block; width: 66px;"></span>
+                    {% endif %}
 
-{% if log_lines %}
-<pre style="border:1px solid #555; padding:10px; max-height:70vh; overflow:auto; white-space:pre; background-color:#1e1e1e; color:#f1f1f1;">
-{% for line in log_lines %}
-{{ line }}
-{% endfor %}
-</pre>
+                    <form class="d-inline" method="post" action="{{ url_for('delete_backup', log_id=log.id) }}"
+                          onsubmit="return confirm('Usunąć ten wpis?');">
+                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Usuń">🗑️</button>
+                    </form>
+                </div>
+            </td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
 {% else %}
-<p>Brak logów zawierających ten adres IP.</p>
+<div class="alert alert-secondary">Brak historii dla tego urządzenia.</div>
 {% endif %}
 
 {% endblock %}

@@ -18,7 +18,7 @@
     </form>
 
     <button type="submit" class="btn btn-primary btn-sm" form="backup-selected-form">
-        Backup wybranych (zaznacz poniżej)
+        Backup wybranych
     </button>
 
     <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('show_latest_backups') }}">Ostatnie backupy</a>
@@ -33,25 +33,21 @@
 </div>
 
 <form method="post" action="{{ url_for('backup_selected') }}" id="backup-selected-form">
-
     <div class="mb-2">
         <div class="form-check">
             <input class="form-check-input" type="checkbox" id="select-all">
-            <label class="form-check-label" for="select-all">
-                Zaznacz wszystkie
-            </label>
+            <label class="form-check-label" for="select-all">Zaznacz wszystkie</label>
         </div>
     </div>
 
     <table id="device-table" class="table table-sm table-striped table-hover align-middle">
         <thead>
         <tr>
-            <th style="width: 40px;">Wybierz</th>
+            <th style="width: 40px;">#</th>
             <th>Adres IP / sysname</th>
             <th style="width: 160px;">Ostatni backup</th>
             <th style="width: 80px;">Status</th>
-            <th style="width: 130px;">Backupy</th>
-            <th style="width: 90px;">Logi</th>
+            <th style="width: 140px;">Akcje</th>
         </tr>
         </thead>
         <tbody>
@@ -67,26 +63,26 @@
                 {% endif %}
             </td>
             <td>
-                {% if d.last_backup %}
-                    {{ d.last_backup.strftime("%Y-%m-%d %H:%M") }}
+                {% if d.last_backup_time %}
+                    {{ d.last_backup_time.strftime("%Y-%m-%d %H:%M") }}
                 {% else %}
                     <span class="text-muted">–</span>
                 {% endif %}
             </td>
             <td class="status-cell">
-                {% if d.status == 'running' %}
-                    <span class="status-running" title="Backup w toku">⏳</span>
-                {% elif d.status == 'success' %}
-                    <span class="status-ok" title="Ostatni backup zakończony sukcesem">✅</span>
+                {% if d.last_status == 'running' %}
+                    <span class="status-running" title="W toku">⏳</span>
+                {% elif d.last_status == 'success' %}
+                    <span class="status-ok" title="Sukces">✅</span>
                 {% else %}
-                    <span class="status-fail" title="Brak backupu lub ostatni backup zakończony błędem">❌</span>
+                    <span class="status-fail" title="Błąd: {{ d.last_error }}">❌</span>
                 {% endif %}
             </td>
             <td>
-                <a class="btn btn-sm btn-secondary" href="{{ url_for('device_backups', ip=d.ip) }}">Pokaż backupy</a>
-            </td>
-            <td>
-                <a class="btn btn-sm btn-secondary" href="{{ url_for('device_logs', ip=d.ip) }}">Logi</a>
+                <a class="btn btn-sm btn-secondary w-100"
+                   href="{{ url_for('device_details', dev_id=d.id) }}">
+                   Szczegóły / Backupy
+                </a>
             </td>
         </tr>
         {% endfor %}
@@ -95,7 +91,7 @@
 </form>
 
 {% else %}
-<p>Brak urządzeń w pliku z listą IP. Sprawdź konfigurację pliku z urządzeniami (zmienna <code>DEVICES_FILE</code>).</p>
+<p>Brak urządzeń w bazie. Użyj komendy <code>flask import-devices</code>.</p>
 {% endif %}
 
 <div class="card mt-4">
@@ -111,9 +107,8 @@
                     </label>
                 </div>
             </div>
-
             <div class="mb-2">
-                <label class="form-label form-label-sm">Godzina uruchomienia (czas lokalny kontenera/serwera):</label>
+                <label class="form-label form-label-sm">Godzina uruchomienia:</label>
                 <div class="d-flex align-items-center gap-1">
                     <input type="number" name="hour" min="0" max="23" value="{{ schedule.hour }}"
                            class="form-control form-control-sm" style="max-width: 70px;">
@@ -122,24 +117,8 @@
                            class="form-control form-control-sm" style="max-width: 70px;">
                 </div>
             </div>
-
-            <div class="mb-2">
-                <span class="form-label form-label-sm d-block">Ostatnie wykonanie (wg zapisanej informacji):</span>
-                {% if schedule.last_run_date %}
-                    <span>{{ schedule.last_run_date }}</span>
-                {% else %}
-                    <span class="text-muted">brak</span>
-                {% endif %}
-            </div>
-
             <button type="submit" class="btn btn-primary btn-sm mt-1">Zapisz harmonogram</button>
         </form>
-
-        <p class="mt-2 mb-0" style="font-size: 0.8rem;">
-            Uwaga: aby harmonogram działał, musisz uruchamiać skrypt
-            <code>cron_worker.py</code> z CRONA (np. co 5–10 minut).<br>
-            Skrypt sam sprawdzi, czy to już pora na dzisiejszy backup.
-        </p>
     </div>
 </div>
 {% endblock %}

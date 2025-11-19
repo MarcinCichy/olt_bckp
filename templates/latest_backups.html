@@ -2,7 +2,7 @@
 {% block title %}Ostatnie backupy{% endblock %}
 
 {% block content %}
-<h2 class="h5 mb-3">Ostatnie backupy urządzeń</h2>
+<h2 class="h5 mb-3">Ostatnie backupy</h2>
 
 <p class="mb-2">
     <a class="btn btn-link btn-sm text-light p-0" href="{{ url_for('index') }}">← Wróć do listy urządzeń</a>
@@ -11,7 +11,7 @@
 {% if backups %}
 <div class="button-bar">
     <a class="btn btn-primary btn-sm" href="{{ url_for('download_latest_backups_all') }}">
-        Pobierz wszystkie ostatnie backupy (ZIP)
+        Pobierz paczkę ZIP (Najnowsze dla każdego IP)
     </a>
 </div>
 
@@ -19,27 +19,29 @@
     <thead>
     <tr>
         <th>Adres IP</th>
-        <th>Sysname</th>
         <th>Nazwa pliku</th>
         <th>Data utworzenia</th>
         <th>Rozmiar [B]</th>
+        <th>Szyfrowany</th>
         <th>Akcje</th>
     </tr>
     </thead>
     <tbody>
     {% for b in backups %}
     <tr>
-        <td>{{ b.ip }}</td>
-        <td>{{ b.sysname or '-' }}</td>
+        <td>{{ b.device_ip }}</td>
         <td>{{ b.filename }}</td>
         <td>{{ b.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
         <td>{{ b.size_bytes }}</td>
+        <td>
+            {% if b.encrypted %}🔒 Tak{% else %}🔓 Nie{% endif %}
+        </td>
         <td class="text-nowrap">
             <div class="d-flex flex-row flex-wrap gap-2">
                 <a class="btn btn-sm btn-secondary"
-                   href="{{ url_for('view_backup', filename=b.filename) }}">Podgląd</a>
+                   href="{{ url_for('view_backup', log_id=b.id) }}">Podgląd</a>
                 <a class="btn btn-sm btn-secondary"
-                   href="{{ url_for('download_backup', filename=b.filename) }}">Pobierz</a>
+                   href="{{ url_for('download_backup', log_id=b.id) }}">Pobierz</a>
             </div>
         </td>
     </tr>
@@ -47,7 +49,7 @@
     </tbody>
 </table>
 {% else %}
-<p>Brak dostępnych backupów.</p>
+<p>Brak dostępnych backupów w bazie.</p>
 {% endif %}
 
 {% endblock %}
