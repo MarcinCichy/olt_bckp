@@ -51,7 +51,7 @@ def main():
     username = os.getenv("SSH_USERNAME", "").strip()
     password = os.getenv("PASSWORD")
 
-    devices_file = "devices.txt"
+    devices_file = "../devices.txt"
     with open(devices_file, "r", encoding="utf-8") as f:
         device_ips = [line.strip() for line in f if line.strip()]
 
@@ -75,7 +75,7 @@ def main():
         finally:
             client.close()
 
-    with open("versions.log", "w", encoding="utf-8") as f:
+    with open("../versions.log", "w", encoding="utf-8") as f:
         for line in results:
             f.write(line + "\n")
 

@@ -8,10 +8,14 @@ load_dotenv()
 # Dane logowania SSH
 SSH_USERNAME = os.getenv("SSH_USERNAME", "").strip()
 SSH_PASSWORD = os.getenv("PASSWORD", "")
+# Timeout dla połączenia i oczekiwania na dane (w sekundach)
+SSH_TIMEOUT = int(os.getenv("SSH_TIMEOUT", 20))
+
+# Klucz do szyfrowania sesji w Flask (cookie).
+# Wymagane dla bezpieczeństwa aplikacji webowej.
+SECRET_KEY = os.getenv("SECRET_KEY", "change-me-in-production-secret-key")
 
 # Komendy wykonywane na OLT.
-# Pobierane z .env:
-#   COMMAND_1, COMMAND_2, COMMAND_3, COMMAND_4, COMMAND_5
 COMMANDS = [
     os.getenv("COMMAND_1"),
     os.getenv("COMMAND_2"),
@@ -21,8 +25,6 @@ COMMANDS = [
 ]
 
 # Plik z listą urządzeń (jeden adres IP w linii).
-# Domyślnie używamy "devices.txt", ale można to nadpisać w .env:
-#   DEVICES_FILE=devices.txt
 DEVICES_FILE = os.getenv("DEVICES_FILE", "devices.txt")
 
 # Katalog, w którym będą trzymane backupy

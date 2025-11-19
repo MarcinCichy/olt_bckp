@@ -1,4 +1,5 @@
 # backup_service.py
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional
@@ -21,15 +22,6 @@ class BackupResult:
 
 @dataclass
 class DeviceStatus:
-    """
-    Informacje o urządzeniu do wyświetlenia na głównej liście:
-      - ip: adres urządzenia,
-      - sysname: nazwa systemowa (jeśli ją znamy z plików backupu),
-      - last_backup: data/godzina ostatniego backupu (na podstawie plików),
-      - has_backup: czy istnieje przynajmniej jeden backup (True/False),
-      - status: 'never', 'running', 'success', 'error'
-      - last_error: ostatni błąd (jeśli był)
-    """
     ip: str
     sysname: Optional[str]
     last_backup: Optional[datetime]
@@ -40,21 +32,17 @@ class DeviceStatus:
 
 class BackupService:
     """
-    Warstwa „logiki biznesowej” – wie:
-      - skąd wziąć listę urządzeń,
-      - jak uruchomić backup (jednego / wielu),
-      - gdzie zapisane są pliki,
-      - jak listować backupy (przez BackupStorage),
-      - jaki jest ostatni status backupu (BackupStatusRepository).
+    Warstwa logiki biznesowej. Zarządza listą urządzeń, uruchamianiem backupu
+    i sprawdzaniem statusów. Posiada blokadę (mutex) dla operacji współbieżnych.
     """
 
     def __init__(
-        self,
-        devices_file: Optional[str] = None,
-        username: Optional[str] = None,
-        password: Optional[str] = None,
-        commands: Optional[List[str]] = None,
-        backup_dir: Optional[str] = None,
+            self,
+            devices_file: Optional[str] = None,
+            username: Optional[str] = None,
+            password: Optional[str] = None,
+            commands: Optional[List[str]] = None,
+            backup_dir: Optional[str] = None,
     ) -> None:
         self.devices_file = devices_file or config.DEVICES_FILE
         self.username = username or config.SSH_USERNAME
@@ -65,23 +53,19 @@ class BackupService:
         self.storage = BackupStorage(self.backup_dir)
         self.status_repo = BackupStatusRepository(config.BACKUP_STATUS_FILE)
 
-        # flaga do anulowania aktualnie wykonywanego backupu
+        # Blokada zapobiegająca równoległemu uruchomieniu backupów
+        self._lock = threading.Lock()
         self._cancel_requested: bool = False
 
-    # === API do anulowania zadań ===
+    def is_running(self) -> bool:
+        """Sprawdza czy backup jest w toku."""
+        return self._lock.locked()
 
     def request_cancel(self) -> None:
-        """
-        Zgłasza żądanie przerwania aktualnie trwającego backupu.
-
-        Uwaga: realnie przerwanie następuje dopiero po zakończeniu
-        backupu bieżącego urządzenia – kolejne urządzenia nie są już
-        uruchamiane.
-        """
-        self._cancel_requested = True
-        logger.info("Otrzymano żądanie anulowania backupu (request_cancel).")
-
-    # === wewnętrzne rzeczy ===
+        """Zgłasza żądanie przerwania."""
+        if self.is_running():
+            self._cancel_requested = True
+            logger.info("Otrzymano żądanie anulowania backupu.")
 
     def _load_devices(self) -> List[str]:
         path = Path(self.devices_file)
@@ -89,27 +73,17 @@ class BackupService:
             logger.warning(f"Plik z urządzeniami nie istnieje: {path}")
             return []
         with path.open("r", encoding="utf-8") as f:
-            ips = [line.strip() for line in f if line.strip()]
+            # Filtrujemy puste linie i komentarze
+            ips = [line.strip() for line in f if line.strip() and not line.strip().startswith("#")]
         return ips
 
     def list_devices(self) -> List[str]:
-        """
-        Zwraca listę IP wczytanych z pliku z urządzeniami.
-        (Używane tam, gdzie nie potrzebujemy statusu.)
-        """
         return self._load_devices()
 
     def list_devices_status(self) -> List[DeviceStatus]:
-        """
-        Zwraca listę urządzeń z informacją o:
-          - adresie IP,
-          - sysname (jeśli znamy z backupów),
-          - dacie/godzinie ostatniego backupu,
-          - statusie,
-          - ostatnim błędzie.
-        """
         ips = self._load_devices()
         statuses: List[DeviceStatus] = []
+        now = datetime.now()
 
         for ip in ips:
             backups = self.storage.list_backups(ip=ip)
@@ -121,19 +95,16 @@ class BackupService:
             status = state.last_result
             last_error = state.last_error
 
-            # --- AUTO-TIMEOUT dla "running" (np. zawieszony backup) ---
             if status == "running" and state.last_run:
                 try:
                     last_run_dt = datetime.fromisoformat(state.last_run)
-                    if datetime.now() - last_run_dt > timedelta(minutes=10):
+                    if now - last_run_dt > timedelta(minutes=30):
                         status = "error"
                         if not last_error:
-                            last_error = "Timeout backupu (running > 10 min)"
+                            last_error = "Backup przerwany (timeout procesu)"
                 except ValueError:
-                    # zły format daty – ignorujemy
                     pass
 
-            # Jeśli nie mamy statusu, ale istnieje backup, to traktujemy jak sukces
             if status == "never" and has_backup:
                 status = "success"
 
@@ -147,116 +118,81 @@ class BackupService:
                     last_error=last_error,
                 )
             )
-
         return statuses
 
     def get_latest_backups_all_devices(self) -> List[BackupFileInfo]:
-        """
-        Zwraca listę ostatnich backupów dla wszystkich urządzeń,
-        po jednym backupie (najświeższym) na każde IP z listy urządzeń.
-        """
         ips = self._load_devices()
         latest: List[BackupFileInfo] = []
-
         for ip in ips:
             backups = self.storage.list_backups(ip=ip)
             if backups:
                 latest.append(backups[0])
-
-        # Posortuj np. po IP
         latest.sort(key=lambda b: b.ip)
         return latest
 
     def backup_all_devices(self) -> List[BackupResult]:
-        """
-        Backup wszystkich urządzeń z pliku.
-        """
         ips = self._load_devices()
         return self.backup_devices(ips)
 
     def backup_devices(self, ips: List[str]) -> List[BackupResult]:
         """
-        Backup tylko wybranych urządzeń (lista IP).
-
-        UWAGA: funkcja respektuje flagę self._cancel_requested.
-        Jeśli z UI zostanie wywołane request_cancel(), to po zakończeniu
-        aktualnie wykonywanego urządzenia pętla zostanie przerwana,
-        a pozostałe IP oznaczone jako "error – anulowano".
+        Główna funkcja wykonująca backup. Jest zabezpieczona blokadą.
         """
+        # Próba założenia blokady. Jeśli zajęte, zwracamy pustą listę/błąd.
+        if not self._lock.acquire(blocking=False):
+            logger.warning("Próba uruchomienia backupu, gdy inny jest w toku.")
+            return []
+
         results: List[BackupResult] = []
-
-        # Przy starcie nowego zadania upewniamy się, że flaga jest wyczyszczona
         self._cancel_requested = False
+
         try:
+            logger.info(f"Rozpoczynam sesję backupu dla {len(ips)} urządzeń.")
+
             for index, ip in enumerate(ips):
-                # Czy użytkownik poprosił o przerwanie?
                 if self._cancel_requested:
-                    logger.info("Backup został przerwany na żądanie użytkownika.")
-                    cancel_msg = "Backup anulowany przez użytkownika."
-                    now_str = datetime.now().isoformat(timespec="seconds")
+                    logger.info("Przerwano pętlę backupu (request_cancel).")
+                    self._mark_cancelled(ips[index:])
+                    break
 
-                    # Wszystkie jeszcze nieprzetworzone IP (w tym bieżące)
-                    # oznaczamy jako błąd/anulowane.
-                    for j in range(index, len(ips)):
-                        ip_rest = ips[j]
-                        self.status_repo.set_error(ip_rest, now_str, cancel_msg)
+                res = self._process_single_ip(ip)
+                results.append(res)
 
-                    break  # kończymy pętlę
-
-                logger.info(f"Rozpoczynam backup urządzenia {ip}")
-                device = Device(
-                    ip=ip,
-                    username=self.username,
-                    password=self.password,
-                    commands=self.commands,
-                    backup_dir=self.backup_dir,
-                )
-
-                start_time = datetime.now()
-                # status "running" dla tego konkretnego IP
-                self.status_repo.set_running(ip, start_time.isoformat(timespec="seconds"))
-
-                try:
-                    backup_path = device.process_device()
-                    end_time = datetime.now()
-
-                    if backup_path:
-                        self.status_repo.set_success(ip, end_time.isoformat(timespec="seconds"))
-                        results.append(
-                            BackupResult(
-                                ip=ip,
-                                backup_path=backup_path,
-                                success=True,
-                            )
-                        )
-                    else:
-                        msg = "Backup nie został utworzony (brak ścieżki do pliku)."
-                        self.status_repo.set_error(ip, end_time.isoformat(timespec="seconds"), msg)
-                        results.append(
-                            BackupResult(
-                                ip=ip,
-                                backup_path=None,
-                                success=False,
-                                error=msg,
-                            )
-                        )
-                except Exception as e:
-                    end_time = datetime.now()
-                    err_msg = str(e)
-                    self.status_repo.set_error(ip, end_time.isoformat(timespec="seconds"), err_msg)
-                    logger.error(f"Błąd podczas backupu urządzenia {ip}: {e}")
-                    results.append(
-                        BackupResult(
-                            ip=ip,
-                            backup_path=None,
-                            success=False,
-                            error=err_msg,
-                        )
-                    )
-
+        except Exception as e:
+            logger.error(f"Nieoczekiwany błąd pętli backupu: {e}")
         finally:
-            # Po zakończeniu zadania (niezależnie czy normalnie, czy po anulowaniu)
-            # flaga jest z powrotem wyczyszczona.
+            self._lock.release()
             self._cancel_requested = False
+            logger.info("Zakończono sesję backupu.")
 
         return results
+
+    def _process_single_ip(self, ip: str) -> BackupResult:
+        start_time = datetime.now()
+        self.status_repo.set_running(ip, start_time.isoformat(timespec="seconds"))
+
+        device = Device(
+            ip=ip,
+            username=self.username,
+            password=self.password,
+            commands=self.commands,
+            backup_dir=self.backup_dir,
+        )
+
+        # process_device obsługuje łączenie, komendy i zapis
+        backup_path = device.process_device()
+        end_time = datetime.now()
+
+        if backup_path:
+            self.status_repo.set_success(ip, end_time.isoformat(timespec="seconds"))
+            return BackupResult(ip=ip, backup_path=backup_path, success=True)
+        else:
+            msg = "Nie utworzono pliku backupu (błąd SSH lub pusta konfiguracja)"
+            self.status_repo.set_error(ip, end_time.isoformat(timespec="seconds"), msg)
+            return BackupResult(ip=ip, backup_path=None, success=False, error=msg)
+
+    def _mark_cancelled(self, ips: List[str]):
+        now_str = datetime.now().isoformat(timespec="seconds")
+        msg = "Backup anulowany przez użytkownika."
+        for ip in ips:
+            self.status_repo.set_error(ip, now_str, msg)

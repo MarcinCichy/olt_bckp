@@ -1,8 +1,8 @@
 # webapp.py
-from datetime import datetime
-import threading
 import io
+import threading
 import zipfile
+from datetime import datetime
 
 from flask import (
     Flask,
@@ -20,40 +20,42 @@ from schedule import ScheduleRepository
 from log_viewer import get_logs_for_ip
 import config
 
-
 app = Flask(__name__)
-# W realnej instalacji zmień na losowy, silny sekret
-app.secret_key = "bardzo-tajny-klucz-zmien-mnie"
+app.secret_key = config.SECRET_KEY
 
+# Singleton serwisu
 backup_service = BackupService()
 storage = backup_service.storage
 schedule_repo = ScheduleRepository(config.SCHEDULE_FILE)
 
 
 def _run_backup_async(ips):
-    """
-    Uruchamia backup dla podanej listy IP w osobnym wątku,
-    żeby nie blokować żądania HTTP (strona od razu się odświeża).
-    """
+    """Uruchamia backup w tle, o ile serwis jest wolny."""
+    if backup_service.is_running():
+        return False
 
     def worker():
         backup_service.backup_devices(ips)
 
     t = threading.Thread(target=worker, daemon=True)
     t.start()
+    return True
 
 
 @app.route("/")
 def index():
-    # Lista urządzeń z informacją o ostatnim backupie i statusie
     devices = backup_service.list_devices_status()
     schedule = schedule_repo.load()
-    has_running = any(d.status == "running" for d in devices)
+
+    # Sprawdzamy statusy, żeby wiedzieć czy odświeżać stronę
+    is_busy = backup_service.is_running()
+    has_running_status = any(d.status == "running" for d in devices)
+
     return render_template(
         "index.html",
         devices=devices,
         schedule=schedule,
-        has_running=has_running,
+        has_running=(is_busy or has_running_status),
     )
 
 
@@ -74,7 +76,8 @@ def download_latest_backups_all():
     with zipfile.ZipFile(mem, "w", zipfile.ZIP_DEFLATED) as zf:
         for b in backups:
             path = storage.get_backup_path(b.filename)
-            zf.write(path, arcname=b.filename)
+            if path.is_file():
+                zf.write(path, arcname=b.filename)
 
     mem.seek(0)
     return send_file(
@@ -87,40 +90,46 @@ def download_latest_backups_all():
 
 @app.route("/backup/all", methods=["POST"])
 def backup_all():
-    # Backup wszystkich urządzeń w tle
-    ips = backup_service.list_devices()
-    if not ips:
-        flash("Brak urządzeń w pliku. Nie można uruchomić backupu.")
+    if backup_service.is_running():
+        flash("Backup jest już w toku.")
         return redirect(url_for("index"))
 
-    _run_backup_async(ips)
+    ips = backup_service.list_devices()
+    if not ips:
+        flash("Brak urządzeń na liście.")
+        return redirect(url_for("index"))
 
-    flash("Backup wszystkich urządzeń został uruchomiony w tle.")
+    if _run_backup_async(ips):
+        flash("Rozpoczęto backup wszystkich urządzeń.")
+    else:
+        flash("Błąd uruchamiania (serwis zajęty).")
+
     return redirect(url_for("index"))
 
 
 @app.route("/backup/selected", methods=["POST"])
 def backup_selected():
+    if backup_service.is_running():
+        flash("Backup jest już w toku.")
+        return redirect(url_for("index"))
+
     ips = request.form.getlist("device_ip")
     if not ips:
         flash("Nie wybrano żadnego urządzenia.")
         return redirect(url_for("index"))
 
-    _run_backup_async(ips)
+    if _run_backup_async(ips):
+        flash(f"Rozpoczęto backup {len(ips)} wybranych urządzeń.")
+    else:
+        flash("Błąd uruchamiania (serwis zajęty).")
 
-    flash("Backup wybranych urządzeń został uruchomiony w tle.")
     return redirect(url_for("index"))
 
 
 @app.route("/backup/cancel", methods=["POST"])
 def backup_cancel():
-    """
-    Endpoint wywoływany z przycisku „Zatrzymaj aktualny backup”.
-    Ustawia flagę anulowania w BackupService.
-    """
     backup_service.request_cancel()
-    flash("Wysłano żądanie zatrzymania aktualnie trwającego backupu. "
-          "Obecne urządzenie może jeszcze dokończyć, pozostałe nie zostaną uruchomione.")
+    flash("Wysłano żądanie anulowania.")
     return redirect(url_for("index"))
 
 
@@ -132,11 +141,8 @@ def device_backups(ip):
 
 @app.route("/device/<ip>/logs")
 def device_logs(ip):
-    """
-    Podgląd logów związanych z danym IP oraz ostatniego statusu backupu.
-    """
     state = backup_service.status_repo.get_record(ip)
-    log_lines = get_logs_for_ip(ip, max_lines=200)
+    log_lines = get_logs_for_ip(ip)
     return render_template("device_logs.html", ip=ip, state=state, log_lines=log_lines)
 
 
@@ -145,20 +151,18 @@ def view_backup(filename):
     try:
         content = storage.read_backup(filename)
     except FileNotFoundError:
-        flash("Plik backupu nie istnieje.")
+        flash("Plik nie istnieje.")
         return redirect(url_for("index"))
     return render_template("view_backup.html", filename=filename, content=content)
 
 
 @app.route("/backup/delete/<filename>", methods=["POST"])
 def delete_backup(filename):
-    deleted = storage.delete_backup(filename)
-    if deleted:
-        flash(f"Backup {filename} został usunięty.")
+    if storage.delete_backup(filename):
+        flash(f"Usunięto plik {filename}.")
     else:
-        flash(f"Backup {filename} nie istnieje.")
-    ref = request.referrer or url_for("index")
-    return redirect(ref)
+        flash("Plik nie istnieje lub nie można go usunąć.")
+    return redirect(request.referrer or url_for("index"))
 
 
 @app.route("/backup/download/<filename>")
@@ -178,7 +182,7 @@ def update_schedule():
         hour = int(request.form.get("hour", "3"))
         minute = int(request.form.get("minute", "0"))
     except ValueError:
-        flash("Nieprawidłowy format godziny lub minut.")
+        flash("Błędny format czasu.")
         return redirect(url_for("index"))
 
     schedule = schedule_repo.load()
@@ -187,18 +191,9 @@ def update_schedule():
     schedule.minute = minute
     schedule_repo.save(schedule)
 
-    flash("Zaktualizowano harmonogram backupu.")
+    flash("Zaktualizowano harmonogram.")
     return redirect(url_for("index"))
 
 
-def create_app():
-    """
-    Funkcja pomocnicza, jeśli będziesz chciał uruchamiać aplikację
-    przez gunicorn/uwsgi itp.
-    """
-    return app
-
-
 if __name__ == "__main__":
-    # Uruchomienie lokalne: python webapp.py
     app.run(host="0.0.0.0", port=5000, debug=True)
