@@ -7,6 +7,7 @@ services:
       - "9091:5000"
     volumes:
       - ./olt_data:/data
+      - ./olt_data/logs:/app/logs  <-- DODAJ TO (Wspólny folder logów)
     environment:
       - DB_TYPE=sqlite
       - DATA_DIR=/data
@@ -25,6 +26,7 @@ services:
     restart: unless-stopped
     volumes:
       - ./olt_data:/data
+      - ./olt_data/logs:/app/logs  <-- DODAJ TO (Wspólny folder logów)
     environment:
       - DB_TYPE=sqlite
       - DATA_DIR=/data
