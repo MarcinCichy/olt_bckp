@@ -1,4 +1,3 @@
-<!-- templates/view_backup.html -->
 {% extends "base.html" %}
 {% block title %}Podgląd backupu {{ filename }}{% endblock %}
 
@@ -16,6 +15,6 @@
 </pre>
 
 <p class="mt-2">
-    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('download_backup', filename=filename) }}">Pobierz ten plik</a>
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('download_backup', log_id=request.view_args['log_id']) }}">Pobierz ten plik</a>
 </p>
 {% endblock %}
