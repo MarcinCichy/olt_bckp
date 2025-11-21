@@ -156,7 +156,7 @@ def backup_cancel():
     return redirect(url_for("index"))
 
 
-# === NOWY, ZINTEGROWANY WIDOK SZCZEGÓŁÓW ===
+# === WIDOKI SZCZEGÓŁOWE ===
 
 @app.route("/device/<int:dev_id>/details")
 @login_required
@@ -259,14 +259,30 @@ def update_schedule():
 @app.route("/backups/latest")
 @login_required
 def show_latest_backups():
-    backups = BackupLog.query.filter_by(status='success').order_by(BackupLog.created_at.desc()).limit(50).all()
-    return render_template("latest_backups.html", backups=backups)
+    """
+    Wyświetla listę ostatnich backupów, ale tylko PO JEDNYM (najnowszym) dla każdego IP.
+    """
+    # Pobieramy większą liczbę logów, aby mieć pewność, że trafimy na każdego hosta
+    # Sortujemy od najnowszych.
+    logs = BackupLog.query.filter_by(status='success').order_by(BackupLog.created_at.desc()).limit(500).all()
+
+    unique_backups = []
+    seen_ips = set()
+
+    for log in logs:
+        if log.device_ip not in seen_ips:
+            unique_backups.append(log)
+            seen_ips.add(log.device_ip)
+
+    # Opcjonalnie można posortować wynik po IP dla czytelności,
+    # ale domyślnie zostawiamy sortowanie po dacie (najświeższe na górze).
+    return render_template("latest_backups.html", backups=unique_backups)
 
 
 @app.route("/backups/latest/download-all")
 @login_required
 def download_latest_backups_all():
-    logs = BackupLog.query.filter_by(status='success').order_by(BackupLog.created_at.desc()).limit(200).all()
+    logs = BackupLog.query.filter_by(status='success').order_by(BackupLog.created_at.desc()).limit(500).all()
     if not logs:
         flash("Brak backupów do pobrania.")
         return redirect(url_for("show_latest_backups"))
