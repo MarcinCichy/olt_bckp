@@ -10,7 +10,6 @@
 
     <script>
         (function () {
-            // DOMYŚLNIE: ciemny motyw, jeśli w localStorage nie ma wpisu
             var saved = localStorage.getItem('theme') || 'dark';
             document.documentElement.setAttribute('data-theme', saved);
             document.documentElement.setAttribute('data-bs-theme', saved);
@@ -35,8 +34,10 @@
                     <a href="{{ url_for('user_admin.list_users') }}" class="mx-2 text-warning">Użytkownicy</a>
                     {% endif %}
 
+                    {% if current_user.is_authenticated %}
                     <span class="text-muted ms-3 me-1">|</span>
                     <a href="{{ url_for('auth.logout') }}" class="text-danger">Wyloguj</a>
+                    {% endif %}
                 </nav>
             </div>
             <button id="theme-toggle" class="btn btn-outline-secondary btn-sm" type="button" title="Przełącz motyw">
@@ -72,33 +73,56 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+
+        // --- 1. Obsługa przełączania motywu (Dark/Light) ---
         var btn = document.getElementById('theme-toggle');
         var icon = document.getElementById('theme-icon');
-        if (!btn || !icon) return;
 
-        function updateIcon() {
-            var theme = document.documentElement.getAttribute('data-bs-theme') || 'dark';
-            if (theme === 'light') {
-                icon.textContent = '🌙';
-                btn.title = 'Przełącz na tryb ciemny';
-            } else {
-                icon.textContent = '☀️';
-                btn.title = 'Przełącz na tryb jasny';
+        if (btn && icon) {
+            function updateIcon() {
+                var theme = document.documentElement.getAttribute('data-bs-theme') || 'dark';
+                if (theme === 'light') {
+                    icon.textContent = '🌙';
+                    btn.title = 'Przełącz na tryb ciemny';
+                } else {
+                    icon.textContent = '☀️';
+                    btn.title = 'Przełącz na tryb jasny';
+                }
+            }
+            updateIcon();
+
+            btn.addEventListener('click', function () {
+                var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                var next = (current === 'light') ? 'dark' : 'light';
+
+                document.documentElement.setAttribute('data-theme', next);
+                document.documentElement.setAttribute('data-bs-theme', next);
+
+                localStorage.setItem('theme', next);
+                updateIcon();
+            });
+        }
+
+        // --- 2. ZAAWANSOWANE BEZPIECZEŃSTWO: Wylogowanie po zamknięciu karty ---
+
+        // Pobieramy status zalogowania z backendu (Jinja renderuje to jako tekst "True" lub "False")
+        var isBackendAuthenticated = "{{ current_user.is_authenticated }}" === "True";
+
+        if (isBackendAuthenticated) {
+            // Sprawdzamy, czy w tej sesji przeglądarki (karcie) mamy ustawioną flagę
+            var sessionFlag = sessionStorage.getItem("olt_session_active");
+
+            if (!sessionFlag) {
+                // Jeśli backend mówi "Zalogowany", ale flaga w sessionStorage nie istnieje,
+                // to znaczy, że użytkownik zamknął wcześniej kartę/przeglądarkę.
+                // Wymuszamy wylogowanie (kill cookie).
+                window.location.href = "{{ url_for('auth.logout') }}";
             }
         }
 
-        updateIcon();
-
-        btn.addEventListener('click', function () {
-            var current = document.documentElement.getAttribute('data-theme') || 'dark';
-            var next = (current === 'light') ? 'dark' : 'light';
-
-            document.documentElement.setAttribute('data-theme', next);
-            document.documentElement.setAttribute('data-bs-theme', next);
-
-            localStorage.setItem('theme', next);
-            updateIcon();
-        });
+        // Ustawiamy flagę, że ta karta jest aktywna.
+        // sessionStorage jest kasowane po zamknięciu karty, ale zostaje po odświeżeniu (F5).
+        sessionStorage.setItem("olt_session_active", "1");
     });
 </script>
 
