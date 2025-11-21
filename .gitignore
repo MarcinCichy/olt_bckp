@@ -39,3 +39,4 @@ old_files/versions.log
 __pycache__
 __pycache/
 tests/
+old_files/
