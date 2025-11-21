@@ -49,16 +49,16 @@ SSH_TIMEOUT = int(os.getenv("SSH_TIMEOUT", 20))
 
 # === PLIKI I KATALOGI (Dla kompatybilności i importu) ===
 # Plik z listą urządzeń (jeden adres IP w linii).
-DEVICES_FILE = os.getenv("DEVICES_FILE", "devices.txt")
+DEVICES_FILE = os.getenv("DEVICES_FILE", "old_files/devices.txt")
 
 # Katalog, w którym będą trzymane backupy
 BACKUP_DIR = os.getenv("BACKUP_DIR", "backups")
 
 # Plik z konfiguracją harmonogramu (zostawiamy dla kompatybilności)
-SCHEDULE_FILE = os.getenv("SCHEDULE_FILE", "backup_schedule.json")
+SCHEDULE_FILE = os.getenv("SCHEDULE_FILE", "old_files/backup_schedule.json")
 
 # Plik statusów (zostawiamy dla kompatybilności)
-BACKUP_STATUS_FILE = os.getenv("BACKUP_STATUS_FILE", "backup_status.json")
+BACKUP_STATUS_FILE = os.getenv("BACKUP_STATUS_FILE", "old_files/backup_status.json")
 
 # === KOMENDY OLT ===
 COMMANDS = [

@@ -9,10 +9,12 @@ from flask_login import login_required, current_user
 from extensions import db, login_manager
 from models import User, Device, BackupLog, Settings
 from auth import auth_bp
+from user_admin import user_admin_bp  # <--- IMPORT NOWEGO MODUŁU
 from backup_service import BackupService
 from log_viewer import get_logs_for_ip
 import security_utils
 import config
+from sqlalchemy import text
 
 app = Flask(__name__)
 app.config.from_object(config)
@@ -23,6 +25,7 @@ login_manager.init_app(app)
 
 # Rejestracja Blueprintów
 app.register_blueprint(auth_bp)
+app.register_blueprint(user_admin_bp)  # <--- REJESTRACJA BLUEPRINTU
 
 # Serwis backupu
 backup_service = BackupService(app)
@@ -64,19 +67,48 @@ def init_db():
     print("Baza danych zainicjalizowana.")
 
 
+@app.cli.command("update-schema")
+def update_schema():
+    """Ręczna aktualizacja schematu bazy (dodanie kolumny is_admin), jeśli używasz SQLite."""
+    try:
+        with app.app_context():
+            # Sprawdźmy czy to SQLite, bo składnia ALTER TABLE może się różnić
+            if 'sqlite' in config.SQLALCHEMY_DATABASE_URI:
+                with db.engine.connect() as conn:
+                    # Próba dodania kolumny. Jeśli istnieje, rzuci błąd, który obsłużymy.
+                    try:
+                        conn.execute(text("ALTER TABLE users ADD COLUMN is_admin BOOLEAN DEFAULT 0"))
+                        conn.commit()
+                        print("Dodano kolumnę 'is_admin' do tabeli 'users'.")
+                    except Exception as e:
+                        if 'duplicate column' in str(e) or 'no such table' in str(e):
+                            print(f"Info: {e}")
+                        else:
+                            # Często w SQLite po prostu "duplicate column name"
+                            print("Kolumna 'is_admin' prawdopodobnie już istnieje lub inny błąd:", e)
+            else:
+                print("Automatyczna aktualizacja dostępna tylko dla SQLite w tym skrypcie.")
+                print("Dla Postgres użyj: ALTER TABLE users ADD COLUMN is_admin BOOLEAN DEFAULT FALSE;")
+    except Exception as e:
+        print(f"Błąd aktualizacji schematu: {e}")
+
+
 @app.cli.command("create-user")
 @click.argument("username")
 @click.argument("password")
-def create_user(username, password):
+@click.option("--admin", is_flag=True, help="Utwórz użytkownika z uprawnieniami administratora")
+def create_user(username, password, admin):
     db.create_all()
     if User.query.filter_by(username=username).first():
         print(f"Użytkownik {username} już istnieje.")
         return
-    u = User(username=username)
+
+    u = User(username=username, is_admin=admin)
     u.set_password(password)
     db.session.add(u)
     db.session.commit()
-    print(f"Utworzono użytkownika: {username}")
+    role = "ADMINA" if admin else "użytkownika"
+    print(f"Utworzono {role}: {username}")
 
 
 @app.cli.command("import-devices")
@@ -274,8 +306,6 @@ def show_latest_backups():
             unique_backups.append(log)
             seen_ips.add(log.device_ip)
 
-    # Opcjonalnie można posortować wynik po IP dla czytelności,
-    # ale domyślnie zostawiamy sortowanie po dacie (najświeższe na górze).
     return render_template("latest_backups.html", backups=unique_backups)
 
 
@@ -313,5 +343,6 @@ def download_latest_backups_all():
 
 if __name__ == "__main__":
     with app.app_context():
+        # Automatyczne utworzenie tabel, jeśli nie istnieją
         db.create_all()
     app.run(host="0.0.0.0", port=5000, debug=True)

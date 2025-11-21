@@ -23,19 +23,19 @@ venv/
 *.zip
 *.gz
 backups/
-olt-backup.tar
+old_files/olt-backup.tar
 
 # Inne śmieci z katalogu roboczego
-full.cr.layout
-full.cr.txt
-replacements.txt
+old_files/full.cr.layout
+old_files/full.cr.txt
+old_files/replacements.txt
 .idea/
-device_one.txt
-devices.txt
-list.txt
-backup_status.json
-backup_schedule.json
-versions.log
+old_files/device_one.txt
+old_files/devices.txt
+old_files/list.txt
+old_files/backup_status.json
+old_files/backup_schedule.json
+old_files/versions.log
 __pycache__
 __pycache/
 tests/

@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}Zarządzanie użytkownikami{% endblock %}
+
+{% block content %}
+<h2 class="h5 mb-3">Zarządzanie użytkownikami</h2>
+
+<div class="card mb-4 border-secondary">
+    <div class="card-header bg-light text-dark fw-bold">Dodaj nowego użytkownika</div>
+    <div class="card-body">
+        <form action="{{ url_for('user_admin.add_user') }}" method="POST" class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label form-label-sm">Nazwa użytkownika</label>
+                <input type="text" name="username" class="form-control" required>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label form-label-sm">Hasło</label>
+                <input type="password" name="password" class="form-control" required>
+            </div>
+            <div class="col-md-3">
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" name="is_admin" id="isAdminCheck">
+                    <label class="form-check-label" for="isAdminCheck">
+                        Prawa administratora
+                    </label>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-success w-100">Utwórz konto</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<h3 class="h6 mb-2">Lista użytkowników</h3>
+<table class="table table-sm table-striped table-hover align-middle olt-table">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Nazwa użytkownika</th>
+            <th>Rola</th>
+            <th class="text-end">Akcje</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for user in users %}
+        <tr>
+            <td>{{ user.id }}</td>
+            <td class="fw-bold">
+                {{ user.username }}
+                {% if user.id == current_user.id %}
+                    <span class="badge bg-info text-dark ms-2">To Ty</span>
+                {% endif %}
+            </td>
+            <td>
+                {% if user.is_admin %}
+                    <span class="badge bg-warning text-dark">Administrator</span>
+                {% else %}
+                    <span class="badge bg-secondary">Użytkownik</span>
+                {% endif %}
+            </td>
+            <td class="text-end">
+                <div class="btn-group" role="group">
+                    <form action="{{ url_for('user_admin.toggle_admin', user_id=user.id) }}" method="POST" class="d-inline">
+                        {% if user.id != current_user.id %}
+                            <button type="submit" class="btn btn-sm btn-outline-secondary" title="Przełącz uprawnienia admina">
+                                {{ "Odbierz Admina" if user.is_admin else "Nadaj Admina" }}
+                            </button>
+                        {% endif %}
+                    </form>
+
+                    <button type="button" class="btn btn-sm btn-outline-warning"
+                            data-bs-toggle="modal"
+                            data-bs-target="#resetPasswordModal{{ user.id }}">
+                        Zmień hasło
+                    </button>
+
+                    {% if user.id != current_user.id %}
+                    <form action="{{ url_for('user_admin.delete_user', user_id=user.id) }}" method="POST"
+                          onsubmit="return confirm('Czy na pewno chcesz usunąć użytkownika {{ user.username }}?');"
+                          class="d-inline" style="margin-left: -1px;">
+                        <button type="submit" class="btn btn-sm btn-outline-danger">Usuń</button>
+                    </form>
+                    {% else %}
+                        <button class="btn btn-sm btn-outline-secondary" disabled>Usuń</button>
+                    {% endif %}
+                </div>
+
+                <div class="modal fade" id="resetPasswordModal{{ user.id }}" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog">
+                        <div class="modal-content" style="background-color: var(--card-bg); color: var(--text-color);">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Zmiana hasła: {{ user.username }}</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <form action="{{ url_for('user_admin.reset_password', user_id=user.id) }}" method="POST">
+                                <div class="modal-body text-start">
+                                    <label class="form-label">Wprowadź nowe hasło:</label>
+                                    <input type="password" name="new_password" class="form-control" required>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Anuluj</button>
+                                    <button type="submit" class="btn btn-primary">Zapisz nowe hasło</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+            </td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

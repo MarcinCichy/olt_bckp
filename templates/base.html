@@ -28,7 +28,15 @@
                 <nav class="small">
                     <a href="{{ url_for('index') }}" class="me-2">Strona główna</a>
                     <span class="text-muted">|</span>
-                    <a href="{{ url_for('show_latest_backups') }}" class="ms-2">Ostatnie backupy</a>
+                    <a href="{{ url_for('show_latest_backups') }}" class="mx-2">Ostatnie backupy</a>
+
+                    {% if current_user.is_authenticated and current_user.is_admin %}
+                    <span class="text-muted">|</span>
+                    <a href="{{ url_for('user_admin.list_users') }}" class="mx-2 text-warning">Użytkownicy</a>
+                    {% endif %}
+
+                    <span class="text-muted ms-3 me-1">|</span>
+                    <a href="{{ url_for('auth.logout') }}" class="text-danger">Wyloguj</a>
                 </nav>
             </div>
             <button id="theme-toggle" class="btn btn-outline-secondary btn-sm" type="button" title="Przełącz motyw">

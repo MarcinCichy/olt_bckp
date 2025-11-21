@@ -18,7 +18,7 @@ command_5 = os.getenv("COMMAND_5")                 # Piąta komenda do wykonania
 commands = [command_1, command_2, command_3, command_4, command_5]
 
 # Ścieżka do pliku zawierającego listę urządzeń (każdy adres IP w nowej linii)
-devices_file = "../device_one.txt"
+devices_file = "device_one.txt"
 
 # Utworzenie instancji managera urządzeń z podanymi parametrami
 manager = DeviceManager(devices_file, username, password, commands)
