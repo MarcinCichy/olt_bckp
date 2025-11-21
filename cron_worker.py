@@ -5,6 +5,8 @@ from logger_conf import logger
 from backup_service import BackupService
 from schedule import ScheduleRepository, should_run_now
 import config
+# Musimy zaimportować obiekt 'app', aby mieć dostęp do bazy danych
+from webapp import app
 
 
 def main() -> None:
@@ -17,12 +19,17 @@ def main() -> None:
         return
 
     logger.info("Auto-backup: start backupu wszystkich urządzeń.")
-    service = BackupService()
-    results = service.backup_all_devices()
-    ok = sum(1 for r in results if r.success)
-    fail = len(results) - ok
-    logger.info(f"Auto-backup: zakończono. Sukces: {ok}, błędy: {fail}.")
 
+    # Tworzymy kontekst aplikacji, aby BackupService widział bazę danych
+    with app.app_context():
+        # Inicjalizujemy serwis przekazując app
+        service = BackupService(app)
+        # Wywołujemy poprawną metodę logiczną (bez tworzenia nowego wątku, bo cron już jest osobnym procesem)
+        service.backup_devices_logic()
+
+    logger.info("Auto-backup: zakończono operację.")
+
+    # Aktualizujemy datę ostatniego uruchomienia, żeby nie uruchomił się znowu za minutę
     schedule.last_run_date = now.date().isoformat()
     repo.save(schedule)
 

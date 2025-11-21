@@ -1,0 +1,46 @@
+services:
+  olt-backup:
+    build: .
+    container_name: olt_backup_system
+    restart: unless-stopped
+    ports:
+      - "9091:5000"
+    volumes:
+      - ./olt_data:/data
+    environment:
+      - DB_TYPE=sqlite
+      - DATA_DIR=/data
+      - BACKUP_DIR=/data/backups
+      - DEVICES_FILE=/data/devices.txt
+      - SCHEDULE_FILE=/data/schedule.json
+      - PYTHONUNBUFFERED=1
+      - TZ=Europe/Warsaw  # <--- DODAJ TO TUTAJ
+    env_file:
+      - .env
+    user: "1000:1000"
+
+  cron:
+    build: .
+    container_name: olt_backup_cron
+    restart: unless-stopped
+    volumes:
+      - ./olt_data:/data
+    environment:
+      - DB_TYPE=sqlite
+      - DATA_DIR=/data
+      - BACKUP_DIR=/data/backups
+      - DEVICES_FILE=/data/devices.txt
+      - SCHEDULE_FILE=/data/schedule.json
+      - PYTHONUNBUFFERED=1
+      - TZ=Europe/Warsaw  # <--- I DODAJ TO TUTAJ
+    env_file:
+      - .env
+    user: "1000:1000"
+    entrypoint: >
+      /bin/sh -c "
+      echo '--> Startuje proces CRON (sprawdzanie harmonogramu co 60s)...';
+      while true; do
+        python cron_worker.py;
+        sleep 60;
+      done
+      "

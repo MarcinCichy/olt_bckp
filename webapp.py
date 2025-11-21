@@ -134,13 +134,24 @@ def import_devices():
 @login_required
 def index():
     devices = Device.query.all()
-    running = backup_service.is_running()
+
+    # Sprawdzamy, czy fizycznie działa wątek w tle
+    thread_active = backup_service.is_running()
+
+    # POPRAWKA: Sprawdzamy też, czy w bazie "wisi" status running.
+    # Dzięki temu strona będzie się odświeżać tak długo, aż klepsydry znikną,
+    # nawet jeśli wątek technicznie już skończył pracę.
+    any_device_running = any(d.last_status == 'running' for d in devices)
+
+    # Decyzja: czy wymusić odświeżenie strony?
+    should_refresh = thread_active or any_device_running
+
     schedule = ScheduleDTO()
     return render_template(
         "index.html",
         devices=devices,
-        has_running=running,
-        is_service_busy=running,
+        has_running=should_refresh,  # To steruje meta-refresh w HTML
+        is_service_busy=thread_active,  # To steruje blokadą przycisków
         schedule=schedule
     )
 
