@@ -1,15 +1,41 @@
+# Pliki środowiskowe i sekrety
 .env
+app.env
+*.env
+
+# Baza danych i instancje Flaska
+instance/
+*.db
+*.sqlite3
+
+# Pliki tymczasowe i logi
+logs/
+*.log
+__pycache__/
+*.pyc
+
+# Wirtualne środowisko
+.venv/
+venv/
+
+# Archiwa i backupy
+*.tar
+*.zip
+*.gz
+backups/
+olt-backup.tar
+
+# Inne śmieci z katalogu roboczego
+full.cr.layout
+full.cr.txt
+replacements.txt
+.idea/
 device_one.txt
 devices.txt
-*.log
-.idea/
-__pycache__
-__pycache/
 list.txt
-.venv/
-tests/
-backups/
-logs/
 backup_status.json
 backup_schedule.json
 versions.log
+__pycache__
+__pycache/
+tests/
