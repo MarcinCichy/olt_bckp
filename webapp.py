@@ -195,7 +195,7 @@ def backup_cancel():
     return redirect(url_for("index"))
 
 
-# === ZARZĄDZANIE URZĄDZENIAMI (NOWE) ===
+# === ZARZĄDZANIE URZĄDZENIAMI ===
 
 @app.route("/device/add", methods=["POST"])
 @login_required
@@ -286,10 +286,14 @@ def download_backup(log_id):
     mem = io.BytesIO()
     mem.write(content.encode('utf-8'))
     mem.seek(0)
+
+    # ZMIANA: Dodajemy rozszerzenie .txt jeśli go nie ma
+    dl_name = log.filename if log.filename.endswith('.txt') else f"{log.filename}.txt"
+
     return send_file(
         mem,
         as_attachment=True,
-        download_name=log.filename,
+        download_name=dl_name,
         mimetype="text/plain"
     )
 
@@ -362,7 +366,10 @@ def download_latest_backups_all():
             path = Path(config.BACKUP_DIR) / log.filename
             if path.exists():
                 content = security_utils.decrypt_from_file(path)
-                zf.writestr(log.filename, content)
+
+                # ZMIANA: Dodajemy rozszerzenie .txt wewnątrz archiwum
+                arcname = log.filename if log.filename.endswith('.txt') else f"{log.filename}.txt"
+                zf.writestr(arcname, content)
 
     mem.seek(0)
     return send_file(
