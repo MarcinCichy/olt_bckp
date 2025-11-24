@@ -35,10 +35,16 @@ def list_users():
 def add_user():
     username = request.form.get('username')
     password = request.form.get('password')
-    is_admin_val = request.form.get('is_admin') == 'on'  # Checkbox zwraca 'on' jeśli zaznaczony
+    confirm_password = request.form.get('confirm_password')  # NOWE POLE
+    is_admin_val = request.form.get('is_admin') == 'on'
 
-    if not username or not password:
-        flash('Nazwa użytkownika i hasło są wymagane.', 'danger')
+    if not username or not password or not confirm_password:
+        flash('Wszystkie pola (nazwa i oba hasła) są wymagane.', 'danger')
+        return redirect(url_for('user_admin.list_users'))
+
+    # WALIDACJA: Sprawdzenie zgodności haseł
+    if password != confirm_password:
+        flash('Podane hasła nie są identyczne.', 'danger')
         return redirect(url_for('user_admin.list_users'))
 
     if User.query.filter_by(username=username).first():
@@ -81,13 +87,19 @@ def delete_user(user_id):
 def reset_password(user_id):
     user = db.session.get(User, user_id)
     new_password = request.form.get('new_password')
+    confirm_password = request.form.get('confirm_password') # NOWE POLE
 
     if not user:
         flash('Nie znaleziono użytkownika.', 'danger')
         return redirect(url_for('user_admin.list_users'))
 
-    if not new_password:
-        flash('Podaj nowe hasło.', 'warning')
+    if not new_password or not confirm_password:
+        flash('Hasło i potwierdzenie są wymagane.', 'warning')
+        return redirect(url_for('user_admin.list_users'))
+
+    # WALIDACJA: Sprawdzenie zgodności haseł
+    if new_password != confirm_password:
+        flash('Podane hasła nie są identyczne.', 'danger')
         return redirect(url_for('user_admin.list_users'))
 
     user.set_password(new_password)

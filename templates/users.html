@@ -7,25 +7,32 @@
 <div class="card mb-4 border-secondary">
     <div class="card-header bg-light text-dark fw-bold">Dodaj nowego użytkownika</div>
     <div class="card-body">
-        <form action="{{ url_for('user_admin.add_user') }}" method="POST" class="row g-3 align-items-end">
-            <div class="col-md-3">
-                <label class="form-label form-label-sm">Nazwa użytkownika</label>
-                <input type="text" name="username" class="form-control" required>
+        <form action="{{ url_for('user_admin.add_user') }}" method="POST" class="row g-3 align-items-start" id="addUserForm" novalidate>
+            <div class="col-md-2">
+                <label class="form-label form-label-sm">Nazwa</label>
+                <input type="text" name="username" class="form-control form-control-sm" required>
             </div>
             <div class="col-md-3">
                 <label class="form-label form-label-sm">Hasło</label>
-                <input type="password" name="password" class="form-control" required>
+                <input type="password" name="password" id="add_pass" class="form-control form-control-sm" required>
             </div>
             <div class="col-md-3">
-                <div class="form-check mb-2">
+                <label class="form-label form-label-sm">Powtórz hasło</label>
+                <input type="password" name="confirm_password" id="add_confirm" class="form-control form-control-sm" required>
+                <div class="invalid-feedback fw-bold">
+                    Hasła nie są identyczne!
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="form-check mt-4">
                     <input class="form-check-input" type="checkbox" name="is_admin" id="isAdminCheck">
-                    <label class="form-check-label" for="isAdminCheck">
-                        Prawa administratora
+                    <label class="form-check-label small" for="isAdminCheck">
+                        Administrator
                     </label>
                 </div>
             </div>
-            <div class="col-md-3">
-                <button type="submit" class="btn btn-success w-100">Utwórz konto</button>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-success btn-sm w-100 mt-4">Utwórz</button>
             </div>
         </form>
     </div>
@@ -92,10 +99,20 @@
                                 <h5 class="modal-title">Zmiana hasła: {{ user.username }}</h5>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                             </div>
-                            <form action="{{ url_for('user_admin.reset_password', user_id=user.id) }}" method="POST">
+                            <form action="{{ url_for('user_admin.reset_password', user_id=user.id) }}" method="POST"
+                                  class="reset-password-form" novalidate>
                                 <div class="modal-body text-start">
-                                    <label class="form-label">Wprowadź nowe hasło:</label>
-                                    <input type="password" name="new_password" class="form-control" required>
+                                    <div class="mb-3">
+                                        <label class="form-label">Nowe hasło:</label>
+                                        <input type="password" name="new_password" id="reset_pass_{{ user.id }}" class="form-control" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Potwierdź hasło:</label>
+                                        <input type="password" name="confirm_password" id="reset_confirm_{{ user.id }}" class="form-control" required>
+                                        <div class="invalid-feedback fw-bold">
+                                            Hasła muszą być identyczne!
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="modal-footer">
                                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Anuluj</button>
@@ -111,4 +128,57 @@
     {% endfor %}
     </tbody>
 </table>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+
+        // --- 1. Obsługa walidacji formularza "Dodaj Użytkownika" ---
+        const addForm = document.getElementById('addUserForm');
+        const addPass = document.getElementById('add_pass');
+        const addConfirm = document.getElementById('add_confirm');
+
+        if(addForm) {
+            addForm.addEventListener('submit', function(event) {
+                // Reset stylów
+                addConfirm.classList.remove('is-invalid');
+                addPass.classList.remove('is-invalid');
+
+                if (addPass.value !== addConfirm.value) {
+                    event.preventDefault(); // ZATRZYMUJEMY WYSYŁANIE
+                    event.stopPropagation();
+
+                    // Dodajemy klasę błędu Bootstrap (pokaże się czerwona ramka i komunikat)
+                    addConfirm.classList.add('is-invalid');
+                    addPass.classList.add('is-invalid');
+                }
+            });
+        }
+
+        // --- 2. Obsługa walidacji wszystkich Modali "Zmień Hasło" ---
+        // Pobieramy wszystkie formularze zmiany hasła
+        const resetForms = document.querySelectorAll('.reset-password-form');
+
+        resetForms.forEach(function(form) {
+            form.addEventListener('submit', function(event) {
+                // Znajdujemy pola wewnątrz TEGO konkretnego formularza
+                const passInput = form.querySelector('input[name="new_password"]');
+                const confirmInput = form.querySelector('input[name="confirm_password"]');
+
+                // Reset stylów
+                confirmInput.classList.remove('is-invalid');
+                passInput.classList.remove('is-invalid');
+
+                if (passInput.value !== confirmInput.value) {
+                    event.preventDefault(); // ZATRZYMUJEMY ZAMYKANIE MODALA
+                    event.stopPropagation();
+
+                    // Pokazujemy błąd wewnątrz modala
+                    confirmInput.classList.add('is-invalid');
+                    passInput.classList.add('is-invalid');
+                }
+            });
+        });
+    });
+</script>
+
 {% endblock %}
