@@ -11,7 +11,7 @@ class User(UserMixin, db.Model):
     username = db.Column(db.String(64), unique=True, nullable=False)
     password_hash = db.Column(db.String(256))
 
-    # NOWA FLAGA: Czy użytkownik jest administratorem?
+    # Flaga: Czy użytkownik jest administratorem?
     is_admin = db.Column(db.Boolean, default=False)
 
     def set_password(self, password):
@@ -45,6 +45,9 @@ class BackupLog(db.Model):
 
     # Czy plik jest zaszyfrowany?
     encrypted = db.Column(db.Boolean, default=True)
+
+    # NOWE POLE: Kto uruchomił backup? 'cron' lub 'manual'
+    trigger_type = db.Column(db.String(20), default='manual')
 
 
 class Settings(db.Model):

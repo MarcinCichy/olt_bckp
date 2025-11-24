@@ -33,11 +33,17 @@ class BackupService:
         return DBDevice.query.filter_by(enabled=True).all()
 
     def backup_all_devices_thread(self):
-        """Funkcja uruchamiana w wątku."""
+        """Funkcja uruchamiana w wątku (z GUI)."""
         with self.app.app_context():
-            self.backup_devices_logic()
+            # Wywołanie ręczne z GUI = 'manual'
+            self.backup_devices_logic(trigger_type='manual')
 
-    def backup_devices_logic(self, selected_ips=None):
+    def backup_devices_logic(self, selected_ips=None, trigger_type='manual'):
+        """
+        Główna pętla backupu.
+        :param selected_ips: Lista IP (opcjonalnie)
+        :param trigger_type: 'manual' lub 'cron'
+        """
         if not self._lock.acquire(blocking=False):
             return
 
@@ -47,14 +53,14 @@ class BackupService:
             if selected_ips:
                 devices = [d for d in devices if d.ip in selected_ips]
 
-            logger.info(f"Start backupu {len(devices)} urządzeń.")
+            logger.info(f"Start backupu {len(devices)} urządzeń. Typ: {trigger_type}")
 
             for dev in devices:
                 if self._cancel_requested:
                     logger.info("Przerwano backup.")
                     break
 
-                self._process_single_device(dev)
+                self._process_single_device(dev, trigger_type)
 
         except Exception as e:
             logger.error(f"Błąd w pętli backupu: {e}")
@@ -62,7 +68,7 @@ class BackupService:
             self._lock.release()
             self._cancel_requested = False
 
-    def _process_single_device(self, db_dev):
+    def _process_single_device(self, db_dev, trigger_type):
         ip = db_dev.ip
 
         # Ustawiamy status na running
@@ -79,11 +85,10 @@ class BackupService:
         )
 
         try:
-            # 1. Pobranie backupu (Device.process_device łączy się i pobiera config)
+            # 1. Pobranie backupu
             plain_path_str = ssh_dev.process_device()
 
-            # === POPRAWKA: Aktualizacja sysname w bazie ===
-            # Jeśli SSHDevice wykrył nazwę urządzenia, zapisujemy ją w bazie danych
+            # Aktualizacja sysname
             if ssh_dev.sysname:
                 db_dev.sysname = ssh_dev.sysname
 
@@ -95,7 +100,6 @@ class BackupService:
                     with plain_path.open("r", encoding="utf-8") as f:
                         content = f.read()
                 except UnicodeDecodeError:
-                    # Fallback dla dziwnych kodowań
                     with plain_path.open("r", encoding="latin-1") as f:
                         content = f.read()
 
@@ -105,15 +109,22 @@ class BackupService:
                     db_dev.last_status = 'success'
                     db_dev.last_backup_time = datetime.now()
 
-                    # Dodajemy wpis do historii logów
+                    # Zapis do logów z uwzględnieniem TYPU
                     log = BackupLog(
                         device_ip=ip,
                         filename=plain_path.name,
                         status='success',
                         size_bytes=plain_path.stat().st_size,
-                        encrypted=True
+                        encrypted=True,
+                        trigger_type=trigger_type  # <-- ZAPISUJEMY CZY MANUAL/CRON
                     )
                     db.session.add(log)
+
+                    # === ROTACJA BACKUPÓW ===
+                    # Czyścimy stare tylko, jeśli uruchomiono z CRONA.
+                    if trigger_type == 'cron':
+                        self._cleanup_old_backups(ip)
+
                 else:
                     db_dev.last_status = 'error'
                     db_dev.last_error = "Błąd szyfrowania pliku"
@@ -126,5 +137,42 @@ class BackupService:
             db_dev.last_error = str(e)
             logger.error(f"Exception device {ip}: {e}")
 
-        # Zapisujemy zmiany w bazie (status, sysname, logi)
+        # Zapisujemy zmiany w bazie
         db.session.commit()
+
+    def _cleanup_old_backups(self, ip: str):
+        """
+        Usuwa najstarsze backupy TYPU CRON dla danego IP, jeśli ich liczba przekracza limit.
+        Backupy 'manual' są ignorowane (zostają na zawsze).
+        """
+        try:
+            # Pobieramy tylko udane backupy automatyczne, posortowane od najnowszego
+            logs = BackupLog.query.filter_by(device_ip=ip, status='success', trigger_type='cron') \
+                .order_by(BackupLog.created_at.desc()) \
+                .all()
+
+            limit = config.MAX_BACKUPS_PER_DEVICE
+
+            if len(logs) > limit:
+                # Lista logów do usunięcia (wszystkie powyżej limitu)
+                logs_to_delete = logs[limit:]
+
+                count = 0
+                for log_entry in logs_to_delete:
+                    # 1. Usuń plik z dysku
+                    file_path = self.backup_dir / log_entry.filename
+                    try:
+                        if file_path.exists():
+                            file_path.unlink()
+                    except OSError as e:
+                        pass  # Ignorujemy błędy przy usuwaniu
+
+                    # 2. Usuń wpis z bazy
+                    db.session.delete(log_entry)
+                    count += 1
+
+                # Nie robimy commit() tutaj, bo zrobi to funkcja nadrzędna
+                logger.info(f"Rotacja (Cron) dla {ip}: usunięto {count} starych plików.")
+
+        except Exception as e:
+            logger.error(f"Błąd podczas rotacji backupów dla {ip}: {e}")

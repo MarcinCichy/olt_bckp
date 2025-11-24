@@ -24,12 +24,12 @@ def main() -> None:
     with app.app_context():
         # Inicjalizujemy serwis przekazując app
         service = BackupService(app)
-        # Wywołujemy poprawną metodę logiczną (bez tworzenia nowego wątku, bo cron już jest osobnym procesem)
-        service.backup_devices_logic()
+        # Wywołujemy z flagą 'cron' - to uruchomi rotację dla tych plików
+        service.backup_devices_logic(trigger_type='cron')
 
     logger.info("Auto-backup: zakończono operację.")
 
-    # Aktualizujemy datę ostatniego uruchomienia, żeby nie uruchomił się znowu za minutę
+    # Aktualizujemy datę ostatniego uruchomienia
     schedule.last_run_date = now.date().isoformat()
     repo.save(schedule)
 

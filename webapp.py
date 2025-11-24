@@ -9,7 +9,7 @@ from flask_login import login_required, current_user
 from extensions import db, login_manager
 from models import User, Device, BackupLog, Settings
 from auth import auth_bp
-from user_admin import user_admin_bp  # <--- IMPORT NOWEGO MODUŁU
+from user_admin import user_admin_bp
 from backup_service import BackupService
 from log_viewer import get_logs_for_ip
 import security_utils
@@ -25,7 +25,7 @@ login_manager.init_app(app)
 
 # Rejestracja Blueprintów
 app.register_blueprint(auth_bp)
-app.register_blueprint(user_admin_bp)  # <--- REJESTRACJA BLUEPRINTU
+app.register_blueprint(user_admin_bp)
 
 # Serwis backupu
 backup_service = BackupService(app)
@@ -69,26 +69,29 @@ def init_db():
 
 @app.cli.command("update-schema")
 def update_schema():
-    """Ręczna aktualizacja schematu bazy (dodanie kolumny is_admin), jeśli używasz SQLite."""
+    """Ręczna aktualizacja schematu bazy (dodanie kolumn), jeśli używasz SQLite."""
     try:
         with app.app_context():
-            # Sprawdźmy czy to SQLite, bo składnia ALTER TABLE może się różnić
             if 'sqlite' in config.SQLALCHEMY_DATABASE_URI:
                 with db.engine.connect() as conn:
-                    # Próba dodania kolumny. Jeśli istnieje, rzuci błąd, który obsłużymy.
+                    # 1. Próba dodania is_admin (stare)
                     try:
                         conn.execute(text("ALTER TABLE users ADD COLUMN is_admin BOOLEAN DEFAULT 0"))
-                        conn.commit()
-                        print("Dodano kolumnę 'is_admin' do tabeli 'users'.")
-                    except Exception as e:
-                        if 'duplicate column' in str(e) or 'no such table' in str(e):
-                            print(f"Info: {e}")
-                        else:
-                            # Często w SQLite po prostu "duplicate column name"
-                            print("Kolumna 'is_admin' prawdopodobnie już istnieje lub inny błąd:", e)
+                        print("Dodano kolumnę 'is_admin'.")
+                    except Exception:
+                        pass
+
+                        # 2. Próba dodania trigger_type (NOWE)
+                    try:
+                        conn.execute(
+                            text("ALTER TABLE backup_logs ADD COLUMN trigger_type VARCHAR(20) DEFAULT 'manual'"))
+                        print("Dodano kolumnę 'trigger_type'.")
+                    except Exception:
+                        pass
+
+                    conn.commit()
             else:
-                print("Automatyczna aktualizacja dostępna tylko dla SQLite w tym skrypcie.")
-                print("Dla Postgres użyj: ALTER TABLE users ADD COLUMN is_admin BOOLEAN DEFAULT FALSE;")
+                print("Automatyczna aktualizacja dostępna tylko dla SQLite.")
     except Exception as e:
         print(f"Błąd aktualizacji schematu: {e}")
 
@@ -134,24 +137,16 @@ def import_devices():
 @login_required
 def index():
     devices = Device.query.all()
-
-    # Sprawdzamy, czy fizycznie działa wątek w tle
     thread_active = backup_service.is_running()
-
-    # POPRAWKA: Sprawdzamy też, czy w bazie "wisi" status running.
-    # Dzięki temu strona będzie się odświeżać tak długo, aż klepsydry znikną,
-    # nawet jeśli wątek technicznie już skończył pracę.
     any_device_running = any(d.last_status == 'running' for d in devices)
-
-    # Decyzja: czy wymusić odświeżenie strony?
     should_refresh = thread_active or any_device_running
 
     schedule = ScheduleDTO()
     return render_template(
         "index.html",
         devices=devices,
-        has_running=should_refresh,  # To steruje meta-refresh w HTML
-        is_service_busy=thread_active,  # To steruje blokadą przycisków
+        has_running=should_refresh,
+        is_service_busy=thread_active,
         schedule=schedule
     )
 
@@ -183,7 +178,8 @@ def backup_selected():
 
     def worker():
         with app.app_context():
-            backup_service.backup_devices_logic(selected_ips=ips)
+            # Ręczne uruchomienie z GUI zawsze jest 'manual'
+            backup_service.backup_devices_logic(selected_ips=ips, trigger_type='manual')
 
     t = threading.Thread(target=worker)
     t.start()
@@ -204,16 +200,8 @@ def backup_cancel():
 @app.route("/device/<int:dev_id>/details")
 @login_required
 def device_details(dev_id):
-    """
-    Jeden główny widok dla urządzenia.
-    Łączy: Status, Historię plików (z bazy) oraz Logi tekstowe (z pliku).
-    """
     dev = Device.query.get_or_404(dev_id)
-
-    # 1. Historia z bazy danych (pliki backupu)
     db_logs = BackupLog.query.filter_by(device_ip=dev.ip).order_by(BackupLog.created_at.desc()).limit(50).all()
-
-    # 2. Logi tekstowe z pliku app.log (ostatnie 100 linii dla tego IP)
     text_logs = get_logs_for_ip(dev.ip, max_lines=100)
 
     return render_template(
@@ -224,7 +212,6 @@ def device_details(dev_id):
     )
 
 
-# Przekierowania starych tras dla bezpieczeństwa
 @app.route("/device/<int:dev_id>/logs")
 @login_required
 def device_logs(dev_id):
@@ -302,21 +289,13 @@ def update_schedule():
 @app.route("/backups/latest")
 @login_required
 def show_latest_backups():
-    """
-    Wyświetla listę ostatnich backupów, ale tylko PO JEDNYM (najnowszym) dla każdego IP.
-    """
-    # Pobieramy większą liczbę logów, aby mieć pewność, że trafimy na każdego hosta
-    # Sortujemy od najnowszych.
     logs = BackupLog.query.filter_by(status='success').order_by(BackupLog.created_at.desc()).limit(500).all()
-
     unique_backups = []
     seen_ips = set()
-
     for log in logs:
         if log.device_ip not in seen_ips:
             unique_backups.append(log)
             seen_ips.add(log.device_ip)
-
     return render_template("latest_backups.html", backups=unique_backups)
 
 
@@ -354,6 +333,5 @@ def download_latest_backups_all():
 
 if __name__ == "__main__":
     with app.app_context():
-        # Automatyczne utworzenie tabel, jeśli nie istnieją
         db.create_all()
     app.run(host="0.0.0.0", port=5000, debug=True)
