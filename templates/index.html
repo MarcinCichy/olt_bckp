@@ -10,28 +10,36 @@
 {% block content %}
 <h2 class="h5 mb-3">Lista urządzeń</h2>
 
-{% if devices %}
+<div class="button-bar d-flex justify-content-between align-items-start">
 
-<div class="button-bar">
-    <form method="post" action="{{ url_for('backup_all') }}" class="inline">
-        <button type="submit" class="btn btn-primary btn-sm">Backup wszystkich urządzeń</button>
-    </form>
+    <div class="d-flex gap-2 flex-wrap">
+        <form method="post" action="{{ url_for('backup_all') }}" class="inline">
+            <button type="submit" class="btn btn-primary btn-sm">Backup wszystkich</button>
+        </form>
 
-    <button type="submit" class="btn btn-primary btn-sm" form="backup-selected-form">
-        Backup wybranych
-    </button>
-
-    <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('show_latest_backups') }}">Ostatnie backupy</a>
-
-    {% if has_running %}
-    <form method="post" action="{{ url_for('backup_cancel') }}" class="inline">
-        <button type="submit" class="btn btn-warning btn-sm">
-            Zatrzymaj aktualny backup
+        <button type="submit" class="btn btn-primary btn-sm" form="backup-selected-form">
+            Backup wybranych
         </button>
-    </form>
-    {% endif %}
+
+        <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('show_latest_backups') }}">Ostatnie backupy</a>
+
+        {% if has_running %}
+        <form method="post" action="{{ url_for('backup_cancel') }}" class="inline">
+            <button type="submit" class="btn btn-warning btn-sm">
+                Zatrzymaj aktualny backup
+            </button>
+        </form>
+        {% endif %}
+    </div>
+
+    <div>
+        <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#addDeviceModal">
+            + Dodaj urządzenie
+        </button>
+    </div>
 </div>
 
+{% if devices %}
 <form method="post" action="{{ url_for('backup_selected') }}" id="backup-selected-form">
     <div class="mb-2">
         <div class="form-check">
@@ -47,7 +55,7 @@
             <th>Adres IP / sysname</th>
             <th style="width: 160px;">Ostatni backup</th>
             <th style="width: 80px;">Status</th>
-            <th style="width: 140px;">Akcje</th>
+            <th style="width: 180px;">Akcje</th>
         </tr>
         </thead>
         <tbody>
@@ -59,7 +67,7 @@
             <td>
                 <span class="fw-semibold">{{ d.ip }}</span>
                 {% if d.sysname %}
-                    <span class="text-muted">({{ d.sysname }})</span>
+                    <span class="text-muted small">({{ d.sysname }})</span>
                 {% endif %}
             </td>
             <td>
@@ -79,10 +87,17 @@
                 {% endif %}
             </td>
             <td>
-                <a class="btn btn-sm btn-secondary w-100"
-                   href="{{ url_for('device_details', dev_id=d.id) }}">
-                   Szczegóły / Backupy
-                </a>
+                <div class="d-flex gap-1">
+                    <a class="btn btn-sm btn-secondary flex-grow-1"
+                       href="{{ url_for('device_details', dev_id=d.id) }}">
+                       Szczegóły
+                    </a>
+
+                    <button type="button" class="btn btn-sm btn-outline-danger"
+                            onclick="if(confirm('Czy na pewno usunąć urządzenie {{ d.ip }} z listy? Historia backupów pozostanie.')) { document.getElementById('del-dev-{{ d.id }}').submit(); }">
+                        🗑️
+                    </button>
+                </div>
             </td>
         </tr>
         {% endfor %}
@@ -90,11 +105,39 @@
     </table>
 </form>
 
+{% for d in devices %}
+<form id="del-dev-{{ d.id }}" action="{{ url_for('delete_device', dev_id=d.id) }}" method="POST" style="display:none;"></form>
+{% endfor %}
+
 {% else %}
-<p>Brak urządzeń w bazie. Użyj komendy <code>flask import-devices</code>.</p>
+<p class="mt-3">Brak urządzeń w bazie. Kliknij "Dodaj urządzenie" lub użyj importu.</p>
 {% endif %}
 
-<div class="card mt-4">
+<div class="modal fade" id="addDeviceModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content" style="background-color: var(--card-bg); color: var(--text-color);">
+            <div class="modal-header">
+                <h5 class="modal-title">Dodaj nowe urządzenie</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ url_for('add_device') }}" method="POST">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="ipInput" class="form-label">Adres IP</label>
+                        <input type="text" class="form-control" id="ipInput" name="ip" placeholder="np. 192.168.1.10" required>
+                        <div class="form-text">Urządzenie zostanie dodane do bazy i uwzględnione w backupach.</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Anuluj</button>
+                    <button type="submit" class="btn btn-success">Zapisz</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="card mt-4 border-secondary">
     <div class="card-body">
         <h2 class="h5 card-title">Automatyczny backup (CRON / harmonogram)</h2>
         <form method="post" action="{{ url_for('update_schedule') }}">

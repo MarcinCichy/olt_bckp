@@ -74,14 +74,14 @@ def update_schema():
         with app.app_context():
             if 'sqlite' in config.SQLALCHEMY_DATABASE_URI:
                 with db.engine.connect() as conn:
-                    # 1. Próba dodania is_admin (stare)
+                    # 1. Próba dodania is_admin
                     try:
                         conn.execute(text("ALTER TABLE users ADD COLUMN is_admin BOOLEAN DEFAULT 0"))
                         print("Dodano kolumnę 'is_admin'.")
                     except Exception:
                         pass
 
-                        # 2. Próba dodania trigger_type (NOWE)
+                        # 2. Próba dodania trigger_type
                     try:
                         conn.execute(
                             text("ALTER TABLE backup_logs ADD COLUMN trigger_type VARCHAR(20) DEFAULT 'manual'"))
@@ -131,7 +131,7 @@ def import_devices():
         print("Plik devices.txt nie istnieje.")
 
 
-# === WIDOKI ===
+# === WIDOKI GŁÓWNE ===
 
 @app.route("/")
 @login_required
@@ -193,6 +193,48 @@ def backup_cancel():
     backup_service.request_cancel()
     flash("Wysłano żądanie anulowania.")
     return redirect(url_for("index"))
+
+
+# === ZARZĄDZANIE URZĄDZENIAMI (NOWE) ===
+
+@app.route("/device/add", methods=["POST"])
+@login_required
+def add_device():
+    ip = request.form.get("ip", "").strip()
+    if not ip:
+        flash("Adres IP nie może być pusty.", "warning")
+        return redirect(url_for('index'))
+
+    if Device.query.filter_by(ip=ip).first():
+        flash(f"Urządzenie {ip} już istnieje w bazie.", "warning")
+        return redirect(url_for('index'))
+
+    try:
+        new_dev = Device(ip=ip, enabled=True)
+        db.session.add(new_dev)
+        db.session.commit()
+        flash(f"Dodano urządzenie: {ip}", "success")
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Błąd bazy danych: {e}", "danger")
+
+    return redirect(url_for('index'))
+
+
+@app.route("/device/delete/<int:dev_id>", methods=["POST"])
+@login_required
+def delete_device(dev_id):
+    dev = Device.query.get_or_404(dev_id)
+    ip = dev.ip
+    try:
+        db.session.delete(dev)
+        db.session.commit()
+        flash(f"Usunięto urządzenie: {ip}", "success")
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Błąd usuwania: {e}", "danger")
+
+    return redirect(url_for('index'))
 
 
 # === WIDOKI SZCZEGÓŁOWE ===
