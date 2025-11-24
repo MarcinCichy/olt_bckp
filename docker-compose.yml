@@ -7,7 +7,7 @@ services:
       - "9091:5000"
     volumes:
       - ./olt_data:/data
-      - ./olt_data/logs:/app/logs  <-- DODAJ TO (Wspólny folder logów)
+      - ./olt_data/logs:/app/logs
     environment:
       - DB_TYPE=sqlite
       - DATA_DIR=/data
@@ -15,7 +15,7 @@ services:
       - DEVICES_FILE=/data/devices.txt
       - SCHEDULE_FILE=/data/schedule.json
       - PYTHONUNBUFFERED=1
-      - TZ=Europe/Warsaw  # <--- DODAJ TO TUTAJ
+      - TZ=Europe/Warsaw
     env_file:
       - .env
     user: "1000:1000"
@@ -26,7 +26,7 @@ services:
     restart: unless-stopped
     volumes:
       - ./olt_data:/data
-      - ./olt_data/logs:/app/logs  <-- DODAJ TO (Wspólny folder logów)
+      - ./olt_data/logs:/app/logs
     environment:
       - DB_TYPE=sqlite
       - DATA_DIR=/data
@@ -34,7 +34,7 @@ services:
       - DEVICES_FILE=/data/devices.txt
       - SCHEDULE_FILE=/data/schedule.json
       - PYTHONUNBUFFERED=1
-      - TZ=Europe/Warsaw  # <--- I DODAJ TO TUTAJ
+      - TZ=Europe/Warsaw
     env_file:
       - .env
     user: "1000:1000"
