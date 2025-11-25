@@ -1,14 +1,13 @@
 # backup_service.py
 import threading
 from pathlib import Path
-from typing import List, Optional
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from logger_conf import logger
 from device import Device as SSHDevice
 import config
 from extensions import db
-from models import Device as DBDevice, BackupLog, Settings
+from models import Device as DBDevice, BackupLog
 import security_utils
 
 
@@ -16,9 +15,16 @@ class BackupService:
     def __init__(self, app=None):
         self.app = app
         self.backup_dir = Path(config.BACKUP_DIR)
-        self.backup_dir.mkdir(parents=True, exist_ok=True)
+        self.backup_dir.resolve().mkdir(parents=True, exist_ok=True)
+        # Logowanie ścieżki (zostawiamy, przydaje się)
+        logger.info(f"--> KATALOG BACKUPÓW: {self.backup_dir.resolve()}")
+
         self._lock = threading.Lock()
         self._cancel_requested = False
+
+    def init_app(self, app):
+        """Pozwala przypisać aplikację Flask po utworzeniu instancji."""
+        self.app = app
 
     def is_running(self) -> bool:
         return self._lock.locked()
@@ -28,22 +34,16 @@ class BackupService:
             self._cancel_requested = True
             logger.info("Otrzymano żądanie anulowania backupu.")
 
-    def get_devices_list(self):
-        """Pobiera aktywne urządzenia z BAZY DANYCH."""
-        return DBDevice.query.filter_by(enabled=True).all()
-
     def backup_all_devices_thread(self):
         """Funkcja uruchamiana w wątku (z GUI)."""
+        if not self.app:
+            logger.error("Błąd: BackupService nie ma przypisanej aplikacji (self.app is None)")
+            return
+
         with self.app.app_context():
-            # Wywołanie ręczne z GUI = 'manual'
             self.backup_devices_logic(trigger_type='manual')
 
     def backup_devices_logic(self, selected_ips=None, trigger_type='manual'):
-        """
-        Główna pętla backupu.
-        :param selected_ips: Lista IP (opcjonalnie)
-        :param trigger_type: 'manual' lub 'cron'
-        """
         if not self._lock.acquire(blocking=False):
             return
 
@@ -71,7 +71,6 @@ class BackupService:
     def _process_single_device(self, db_dev, trigger_type):
         ip = db_dev.ip
 
-        # Ustawiamy status na running
         db_dev.last_status = 'running'
         db_dev.last_error = None
         db.session.commit()
@@ -80,73 +79,60 @@ class BackupService:
             ip=ip,
             username=config.SSH_USERNAME,
             password=config.SSH_PASSWORD,
-            commands=config.COMMANDS,
-            backup_dir=str(self.backup_dir)
+            commands=config.COMMANDS
         )
 
         try:
-            # 1. Pobranie backupu
-            plain_path_str = ssh_dev.process_device()
+            ssh_dev.connect()
+            ssh_dev.run_commands()
+            content, sysname = ssh_dev.get_result()
+            ssh_dev.disconnect()
 
-            # Aktualizacja sysname
-            if ssh_dev.sysname:
-                db_dev.sysname = ssh_dev.sysname
+            if sysname:
+                db_dev.sysname = sysname
 
-            if plain_path_str:
-                plain_path = Path(plain_path_str)
+            if content:
+                safe_sysname = "".join(c for c in sysname if c.isalnum() or c in ('-', '_')) if sysname else ""
+                base_name = f"{ip}_{safe_sysname}" if safe_sysname else ip
+                timestamp = datetime.now().strftime("%d%m%y_%H%M")
 
-                # 2. Odczyt (plain text)
-                try:
-                    with plain_path.open("r", encoding="utf-8") as f:
-                        content = f.read()
-                except UnicodeDecodeError:
-                    with plain_path.open("r", encoding="latin-1") as f:
-                        content = f.read()
+                filename = f"{base_name}_{timestamp}.txt"
+                file_path = self.backup_dir / filename
 
-                # 3. Szyfrowanie i nadpisanie pliku
-                if security_utils.encrypt_to_file(content, plain_path):
-                    # Sukces
+                if security_utils.encrypt_to_file(content, file_path):
                     db_dev.last_status = 'success'
                     db_dev.last_backup_time = datetime.now()
 
-                    # Zapis do logów z uwzględnieniem TYPU
                     log = BackupLog(
                         device_ip=ip,
-                        filename=plain_path.name,
+                        filename=filename,
                         status='success',
-                        size_bytes=plain_path.stat().st_size,
+                        size_bytes=file_path.stat().st_size,
                         encrypted=True,
-                        trigger_type=trigger_type  # <-- ZAPISUJEMY CZY MANUAL/CRON
+                        trigger_type=trigger_type
                     )
                     db.session.add(log)
 
-                    # === ROTACJA BACKUPÓW ===
-                    # Czyścimy stare tylko, jeśli uruchomiono z CRONA.
                     if trigger_type == 'cron':
                         self._cleanup_old_backups(ip)
-
                 else:
                     db_dev.last_status = 'error'
-                    db_dev.last_error = "Błąd szyfrowania pliku"
+                    db_dev.last_error = "Błąd zapisu/szyfrowania pliku na dysku"
             else:
                 db_dev.last_status = 'error'
-                db_dev.last_error = "Błąd SSH lub pusta konfiguracja"
+                db_dev.last_error = "Pusta konfiguracja lub błąd komendy"
 
         except Exception as e:
             db_dev.last_status = 'error'
             db_dev.last_error = str(e)
             logger.error(f"Exception device {ip}: {e}")
+        finally:
+            ssh_dev.disconnect()
 
-        # Zapisujemy zmiany w bazie
         db.session.commit()
 
     def _cleanup_old_backups(self, ip: str):
-        """
-        Usuwa najstarsze backupy TYPU CRON dla danego IP, jeśli ich liczba przekracza limit.
-        Backupy 'manual' są ignorowane (zostają na zawsze).
-        """
         try:
-            # Pobieramy tylko udane backupy automatyczne, posortowane od najnowszego
             logs = BackupLog.query.filter_by(device_ip=ip, status='success', trigger_type='cron') \
                 .order_by(BackupLog.created_at.desc()) \
                 .all()
@@ -154,25 +140,19 @@ class BackupService:
             limit = config.MAX_BACKUPS_PER_DEVICE
 
             if len(logs) > limit:
-                # Lista logów do usunięcia (wszystkie powyżej limitu)
                 logs_to_delete = logs[limit:]
-
                 count = 0
                 for log_entry in logs_to_delete:
-                    # 1. Usuń plik z dysku
                     file_path = self.backup_dir / log_entry.filename
                     try:
                         if file_path.exists():
                             file_path.unlink()
-                    except OSError as e:
-                        pass  # Ignorujemy błędy przy usuwaniu
+                    except OSError:
+                        pass
 
-                    # 2. Usuń wpis z bazy
                     db.session.delete(log_entry)
                     count += 1
 
-                # Nie robimy commit() tutaj, bo zrobi to funkcja nadrzędna
                 logger.info(f"Rotacja (Cron) dla {ip}: usunięto {count} starych plików.")
-
         except Exception as e:
-            logger.error(f"Błąd podczas rotacji backupów dla {ip}: {e}")
+            logger.error(f"Błąd rotacji dla {ip}: {e}")

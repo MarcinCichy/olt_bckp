@@ -3,7 +3,6 @@ import os
 from datetime import timedelta
 from dotenv import load_dotenv
 
-# Ładowanie zmiennych środowiskowych z pliku .env (jeśli istnieje lokalnie)
 load_dotenv()
 
 # === USTAWIENIA BAZY DANYCH ===
@@ -24,27 +23,20 @@ else:
 SQLALCHEMY_TRACK_MODIFICATIONS = False
 
 # === BEZPIECZEŃSTWO ===
-
-# POPRAWKA: Bierzemy klucz z .env. Jeśli go nie ma (błąd konfigu), dopiero wtedy losujemy.
 SECRET_KEY = os.getenv("SECRET_KEY", os.urandom(24))
-
-# Konfiguracja wygasania sesji
 SESSION_PERMANENT = False
 PERMANENT_SESSION_LIFETIME = timedelta(minutes=30)
-
-# Klucz do szyfrowania plików backupu
 BACKUP_ENCRYPTION_KEY = os.getenv("BACKUP_ENCRYPTION_KEY")
+
+# === KONFIGURACJA BACKUPU ===
+MAX_BACKUPS_PER_DEVICE = int(os.getenv("MAX_BACKUPS_PER_DEVICE", 7))
+BACKUP_DIR = os.getenv("BACKUP_DIR", "backups")
+DEVICES_FILE = os.getenv("DEVICES_FILE", "devices.txt")
 
 # === SSH ===
 SSH_USERNAME = os.getenv("SSH_USERNAME", "").strip()
 SSH_PASSWORD = os.getenv("SSH_PASSWORD", "")
 SSH_TIMEOUT = int(os.getenv("SSH_TIMEOUT", 20))
-
-# === PLIKI I KATALOGI ===
-DEVICES_FILE = os.getenv("DEVICES_FILE", "devices.txt")
-BACKUP_DIR = os.getenv("BACKUP_DIR", "backups")
-SCHEDULE_FILE = os.getenv("SCHEDULE_FILE", "backup_schedule.json")
-BACKUP_STATUS_FILE = os.getenv("BACKUP_STATUS_FILE", "backup_status.json")
 
 # === KOMENDY OLT ===
 COMMAND_1 = os.getenv("COMMAND_1")

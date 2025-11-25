@@ -1,76 +1,109 @@
 # schedule.py
-import json
 from dataclasses import dataclass
 from datetime import datetime
-from pathlib import Path
 from typing import Optional
 
+from extensions import db
+from models import Settings
 from logger_conf import logger
 
 
 @dataclass
 class BackupSchedule:
     """
-    Prosta reprezentacja harmonogramu:
-      - enabled: czy auto-backup jest włączony,
-      - hour, minute: o której godzinie ma się uruchomić,
-      - last_run_date: data ostatniego uruchomienia (YYYY-MM-DD jako string),
-        żeby nie robić backupu kilka razy tego samego dnia.
+    Reprezentacja harmonogramu w pamięci.
     """
-    enabled: bool = True
+    enabled: bool = False
     hour: int = 3
     minute: int = 0
     last_run_date: Optional[str] = None
 
 
-class ScheduleRepository:
+class ScheduleService:
     """
-    Odpowiada za zapis/odczyt harmonogramu do pliku JSON.
+    Serwis do zarządzania harmonogramem w bazie danych (tabela Settings).
     """
 
-    def __init__(self, path: str) -> None:
-        self.path = Path(path)
+    @staticmethod
+    def _get_setting(key: str, default: str) -> str:
+        """Pobiera surową wartość z tabeli Settings lub zwraca default."""
+        # Używamy db.session.get (SQLAlchemy 2.0 style) lub query.get
+        # W Twoim kodzie używasz db.session.get
+        setting = db.session.get(Settings, key)
+        return setting.value if setting else default
 
-    def load(self) -> BackupSchedule:
-        if not self.path.is_file():
-            logger.info(f"Plik harmonogramu nie istnieje, używam domyślnych wartości: {self.path}")
-            return BackupSchedule()
+    @staticmethod
+    def _set_setting(key: str, value: str) -> None:
+        """Zapisuje wartość do tabeli Settings."""
+        setting = db.session.get(Settings, key)
+        if not setting:
+            setting = Settings(key=key, value=str(value))
+            db.session.add(setting)
+        else:
+            setting.value = str(value)
+        # Commit powinien być wywoływany tutaj, aby zmiany były trwałe od razu
+        db.session.commit()
+
+    @classmethod
+    def load_schedule(cls) -> BackupSchedule:
+        """
+        Ładuje konfigurację harmonogramu z bazy danych.
+        """
         try:
-            raw = self.path.read_text(encoding="utf-8")
-            data = json.loads(raw)
+            enabled_str = cls._get_setting('schedule_enabled', '0')
+            hour_str = cls._get_setting('schedule_hour', '3')
+            minute_str = cls._get_setting('schedule_minute', '0')
+            last_run = cls._get_setting('schedule_last_run', None)
+
+            # Konwersja typów
+            enabled = (enabled_str == '1')
+            hour = int(hour_str)
+            minute = int(minute_str)
+
             return BackupSchedule(
-                enabled=bool(data.get("enabled", True)),
-                hour=int(data.get("hour", 3)),
-                minute=int(data.get("minute", 0)),
-                last_run_date=data.get("last_run_date"),
+                enabled=enabled,
+                hour=hour,
+                minute=minute,
+                last_run_date=last_run
             )
         except Exception as e:
-            logger.error(f"Nie udało się odczytać pliku harmonogramu {self.path}: {e}")
+            logger.error(f"Błąd odczytu harmonogramu z DB: {e}. Używam domyślnych.")
             return BackupSchedule()
 
-    def save(self, schedule: BackupSchedule) -> None:
-        data = {
-            "enabled": schedule.enabled,
-            "hour": schedule.hour,
-            "minute": schedule.minute,
-            "last_run_date": schedule.last_run_date,
-        }
-        self.path.write_text(json.dumps(data, indent=2), encoding="utf-8")
-        logger.info(f"Zapisano harmonogram do pliku: {self.path}")
+    @classmethod
+    def save_schedule(cls, schedule: BackupSchedule) -> None:
+        """
+        Zapisuje obiekt harmonogramu do bazy danych.
+        """
+        try:
+            cls._set_setting('schedule_enabled', '1' if schedule.enabled else '0')
+            cls._set_setting('schedule_hour', str(schedule.hour))
+            cls._set_setting('schedule_minute', str(schedule.minute))
+            if schedule.last_run_date:
+                cls._set_setting('schedule_last_run', schedule.last_run_date)
+
+            logger.info("Zapisano harmonogram do bazy danych.")
+        except Exception as e:
+            logger.error(f"Błąd zapisu harmonogramu do DB: {e}")
+
+    @classmethod
+    def update_last_run_date(cls, date_str: str) -> None:
+        """Aktualizuje tylko datę ostatniego uruchomienia."""
+        try:
+            cls._set_setting('schedule_last_run', date_str)
+        except Exception as e:
+            logger.error(f"Błąd aktualizacji daty ostatniego uruchomienia: {e}")
 
 
 def should_run_now(schedule: BackupSchedule, now: datetime) -> bool:
     """
-    Zwraca True, jeśli wg harmonogramu powinniśmy wykonać backup.
-    Zakładamy:
-      - backup raz dziennie,
-      - wykonujemy go o godzinie (hour:minute),
-      - jeśli last_run_date == dzisiejsza data, drugi raz już nie uruchamiamy.
+    Sprawdza, czy należy uruchomić backup (logika bez zmian).
     """
     if not schedule.enabled:
         return False
 
     today_str = now.date().isoformat()
+    # Jeśli już dzisiaj leciał, to nie uruchamiaj
     if schedule.last_run_date == today_str:
         return False
 
@@ -80,6 +113,8 @@ def should_run_now(schedule: BackupSchedule, now: datetime) -> bool:
         second=0,
         microsecond=0,
     )
+
+    # Uruchom jeśli obecny czas >= czas zaplanowany
     if now >= scheduled_today:
         return True
 
