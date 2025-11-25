@@ -5,7 +5,7 @@
 <h2 class="h5 mb-3">Logi urządzenia: {{ device.ip }}</h2>
 
 <p class="mb-2">
-    <a class="btn btn-link btn-sm text-light p-0" href="{{ url_for('index') }}">← Wróć do listy urządzeń</a>
+    <a class="btn btn-link btn-sm text-light p-0" href="{{ url_for('main.index') }}">← Wróć do listy urządzeń</a>
 </p>
 
 <div class="card mb-4 border-secondary">
@@ -77,16 +77,16 @@
                 <div class="d-flex flex-row gap-2">
                     {% if log.status == 'success' %}
                         <a class="btn btn-sm btn-outline-primary"
-                           href="{{ url_for('view_backup', log_id=log.id) }}"
+                           href="{{ url_for('backup.view_backup', log_id=log.id) }}"
                            title="Podgląd">👁️</a>
                         <a class="btn btn-sm btn-outline-success"
-                           href="{{ url_for('download_backup', log_id=log.id) }}"
+                           href="{{ url_for('backup.download_backup', log_id=log.id) }}"
                            title="Pobierz">💾</a>
                     {% else %}
                         <span style="display:inline-block; width: 66px;"></span>
                     {% endif %}
 
-                    <form class="d-inline" method="post" action="{{ url_for('delete_backup', log_id=log.id) }}"
+                    <form class="d-inline" method="post" action="{{ url_for('backup.delete_backup', log_id=log.id) }}"
                           onsubmit="return confirm('Usunąć ten wpis?');">
                         <button type="submit" class="btn btn-sm btn-outline-danger" title="Usuń">🗑️</button>
                     </form>

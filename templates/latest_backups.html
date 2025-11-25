@@ -5,12 +5,12 @@
 <h2 class="h5 mb-3">Ostatnie backupy</h2>
 
 <p class="mb-2">
-    <a class="btn btn-link btn-sm text-light p-0" href="{{ url_for('index') }}">← Wróć do listy urządzeń</a>
+    <a class="btn btn-link btn-sm text-light p-0" href="{{ url_for('main.index') }}">← Wróć do listy urządzeń</a>
 </p>
 
 {% if backups %}
 <div class="button-bar">
-    <a class="btn btn-primary btn-sm" href="{{ url_for('download_latest_backups_all') }}">
+    <a class="btn btn-primary btn-sm" href="{{ url_for('backup.download_latest_backups_all') }}">
         Pobierz paczkę ZIP (Najnowsze dla każdego IP)
     </a>
 </div>
@@ -39,9 +39,9 @@
         <td class="text-nowrap">
             <div class="d-flex flex-row flex-wrap gap-2">
                 <a class="btn btn-sm btn-secondary"
-                   href="{{ url_for('view_backup', log_id=b.id) }}">Podgląd</a>
+                   href="{{ url_for('backup.view_backup', log_id=b.id) }}">Podgląd</a>
                 <a class="btn btn-sm btn-secondary"
-                   href="{{ url_for('download_backup', log_id=b.id) }}">Pobierz</a>
+                   href="{{ url_for('backup.download_backup', log_id=b.id) }}">Pobierz</a>
             </div>
         </td>
     </tr>

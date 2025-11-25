@@ -4,7 +4,6 @@ from schedule import ScheduleService
 
 settings_bp = Blueprint('settings', __name__)
 
-
 @settings_bp.route("/schedule/update", methods=["POST"])
 @login_required
 def update_schedule():
@@ -14,9 +13,8 @@ def update_schedule():
         minute = int(request.form.get("minute", "0"))
     except ValueError:
         flash("Błędny format czasu.")
-        return redirect(url_for("main.index"))
+        return redirect(url_for("main.index")) # POPRAWKA
 
-    # Load, update, save
     current_schedule = ScheduleService.load_schedule()
     current_schedule.enabled = enabled
     current_schedule.hour = hour
@@ -25,4 +23,4 @@ def update_schedule():
     ScheduleService.save_schedule(current_schedule)
 
     flash("Zaktualizowano harmonogram.")
-    return redirect(url_for('main.index'))
+    return redirect(url_for('main.index')) # POPRAWKA

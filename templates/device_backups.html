@@ -5,7 +5,7 @@
 <h2 class="h5 mb-3">Lista plików backupu: {{ device.ip }}</h2>
 
 <p class="mb-2">
-    <a class="btn btn-link btn-sm text-light p-0" href="{{ url_for('index') }}">← Wróć do listy urządzeń</a>
+    <a class="btn btn-link btn-sm text-light p-0" href="{{ url_for('main.index') }}">← Wróć do listy urządzeń</a>
 </p>
 
 {% if logs %}
@@ -36,12 +36,12 @@
             <div class="d-flex flex-row flex-wrap gap-2">
                 {% if log.status == 'success' %}
                     <a class="btn btn-sm btn-secondary"
-                       href="{{ url_for('view_backup', log_id=log.id) }}">Podgląd</a>
+                       href="{{ url_for('backup.view_backup', log_id=log.id) }}">Podgląd</a>
                     <a class="btn btn-sm btn-secondary"
-                       href="{{ url_for('download_backup', log_id=log.id) }}">Pobierz</a>
+                       href="{{ url_for('backup.download_backup', log_id=log.id) }}">Pobierz</a>
                 {% endif %}
 
-                <form class="inline" method="post" action="{{ url_for('delete_backup', log_id=log.id) }}"
+                <form class="inline" method="post" action="{{ url_for('backup.delete_backup', log_id=log.id) }}"
                       onsubmit="return confirm('Na pewno usunąć ten backup?');">
                     <button type="submit" class="btn btn-sm btn-danger">Usuń</button>
                 </form>

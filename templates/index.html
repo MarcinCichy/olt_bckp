@@ -13,7 +13,7 @@
 <div class="button-bar d-flex justify-content-between align-items-start">
 
     <div class="d-flex gap-2 flex-wrap">
-        <form method="post" action="{{ url_for('backup_all') }}" class="inline">
+        <form method="post" action="{{ url_for('backup.backup_all') }}" class="inline">
             <button type="submit" class="btn btn-primary btn-sm">Backup wszystkich</button>
         </form>
 
@@ -21,10 +21,10 @@
             Backup wybranych
         </button>
 
-        <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('show_latest_backups') }}">Ostatnie backupy</a>
+        <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('backup.show_latest_backups') }}">Ostatnie backupy</a>
 
         {% if has_running %}
-        <form method="post" action="{{ url_for('backup_cancel') }}" class="inline">
+        <form method="post" action="{{ url_for('backup.backup_cancel') }}" class="inline">
             <button type="submit" class="btn btn-warning btn-sm">
                 Zatrzymaj aktualny backup
             </button>
@@ -40,7 +40,7 @@
 </div>
 
 {% if devices %}
-<form method="post" action="{{ url_for('backup_selected') }}" id="backup-selected-form">
+<form method="post" action="{{ url_for('backup.backup_selected') }}" id="backup-selected-form">
     <div class="mb-2">
         <div class="form-check">
             <input class="form-check-input" type="checkbox" id="select-all">
@@ -89,7 +89,7 @@
             <td>
                 <div class="d-flex gap-1">
                     <a class="btn btn-sm btn-secondary flex-grow-1"
-                       href="{{ url_for('device_details', dev_id=d.id) }}">
+                       href="{{ url_for('device.device_details', dev_id=d.id) }}">
                        Szczegóły
                     </a>
 
@@ -106,7 +106,7 @@
 </form>
 
 {% for d in devices %}
-<form id="del-dev-{{ d.id }}" action="{{ url_for('delete_device', dev_id=d.id) }}" method="POST" style="display:none;"></form>
+<form id="del-dev-{{ d.id }}" action="{{ url_for('device.delete_device', dev_id=d.id) }}" method="POST" style="display:none;"></form>
 {% endfor %}
 
 {% else %}
@@ -120,7 +120,7 @@
                 <h5 class="modal-title">Dodaj nowe urządzenie</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form action="{{ url_for('add_device') }}" method="POST">
+            <form action="{{ url_for('device.add_device') }}" method="POST">
                 <div class="modal-body">
                     <div class="mb-3">
                         <label for="ipInput" class="form-label">Adres IP</label>
@@ -140,7 +140,7 @@
 <div class="card mt-4 border-secondary">
     <div class="card-body">
         <h2 class="h5 card-title">Automatyczny backup (CRON / harmonogram)</h2>
-        <form method="post" action="{{ url_for('update_schedule') }}">
+        <form method="post" action="{{ url_for('settings.update_schedule') }}">
             <div class="mb-2">
                 <div class="form-check">
                     <input type="checkbox" class="form-check-input" id="schedule-enabled" name="enabled"

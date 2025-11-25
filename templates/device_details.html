@@ -4,7 +4,7 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h2 class="h5 m-0">Panel urządzenia: <span class="font-monospace">{{ device.ip }}</span></h2>
-    <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('index') }}">← Wróć do listy</a>
+    <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('main.index') }}">← Wróć do listy</a>
 </div>
 
 <div class="card mb-4 border-secondary">
@@ -79,17 +79,17 @@
                     <div class="btn-group" role="group">
                         {% if log.status == 'success' %}
                             <a class="btn btn-sm btn-outline-primary"
-                               href="{{ url_for('view_backup', log_id=log.id) }}"
+                               href="{{ url_for('backup.view_backup', log_id=log.id) }}"
                                title="Podgląd zawartości">👁️</a>
                             <a class="btn btn-sm btn-outline-success"
-                               href="{{ url_for('download_backup', log_id=log.id) }}"
+                               href="{{ url_for('backup.download_backup', log_id=log.id) }}"
                                title="Pobierz">💾</a>
                         {% else %}
                             <button class="btn btn-sm btn-outline-secondary" disabled>👁️</button>
                             <button class="btn btn-sm btn-outline-secondary" disabled>💾</button>
                         {% endif %}
 
-                        <form class="d-inline" method="post" action="{{ url_for('delete_backup', log_id=log.id) }}"
+                        <form class="d-inline" method="post" action="{{ url_for('backup.delete_backup', log_id=log.id) }}"
                               onsubmit="return confirm('Na pewno usunąć?');" style="margin-left: -1px;">
                             <button type="submit" class="btn btn-sm btn-outline-danger" title="Usuń">🗑️</button>
                         </form>

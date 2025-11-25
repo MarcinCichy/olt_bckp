@@ -12,11 +12,11 @@ def add_device():
     ip = request.form.get("ip", "").strip()
     if not ip:
         flash("Adres IP nie może być pusty.", "warning")
-        return redirect(url_for('main.index'))
+        return redirect(url_for('main.index')) # POPRAWKA
 
     if Device.query.filter_by(ip=ip).first():
         flash(f"Urządzenie {ip} już istnieje w bazie.", "warning")
-        return redirect(url_for('main.index'))
+        return redirect(url_for('main.index')) # POPRAWKA
 
     try:
         new_dev = Device(ip=ip, enabled=True)
@@ -27,7 +27,7 @@ def add_device():
         db.session.rollback()
         flash(f"Błąd bazy danych: {e}", "danger")
 
-    return redirect(url_for('main.index'))
+    return redirect(url_for('main.index')) # POPRAWKA
 
 
 @device_bp.route("/device/delete/<int:dev_id>", methods=["POST"])
@@ -43,7 +43,7 @@ def delete_device(dev_id):
         db.session.rollback()
         flash(f"Błąd usuwania: {e}", "danger")
 
-    return redirect(url_for('main.index'))
+    return redirect(url_for('main.index')) # POPRAWKA
 
 
 @device_bp.route("/device/<int:dev_id>/details")
@@ -60,13 +60,13 @@ def device_details(dev_id):
         text_logs=text_logs
     )
 
-# Aliasy dla kompatybilności wstecznej (jeśli były linki)
+# Aliasy
 @device_bp.route("/device/<int:dev_id>/logs")
 @login_required
 def device_logs(dev_id):
-    return redirect(url_for('device.device_details', dev_id=dev_id))
+    return redirect(url_for('device.device_details', dev_id=dev_id)) # POPRAWKA
 
 @device_bp.route("/device/<int:dev_id>/backups")
 @login_required
 def device_backups(dev_id):
-    return redirect(url_for('device.device_details', dev_id=dev_id))
+    return redirect(url_for('device.device_details', dev_id=dev_id)) # POPRAWKA

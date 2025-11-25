@@ -18,12 +18,12 @@ backup_bp = Blueprint('backup', __name__)
 def backup_all():
     if backup_service.is_running():
         flash("Backup trwa...")
-        return redirect(url_for('main.index'))
+        return redirect(url_for('main.index')) # POPRAWKA
 
     t = threading.Thread(target=backup_service.backup_all_devices_thread)
     t.start()
     flash("Uruchomiono backup w tle.")
-    return redirect(url_for('main.index'))
+    return redirect(url_for('main.index')) # POPRAWKA
 
 
 @backup_bp.route("/backup/selected", methods=["POST"])
@@ -31,14 +31,13 @@ def backup_all():
 def backup_selected():
     if backup_service.is_running():
         flash("Backup trwa...")
-        return redirect(url_for('main.index'))
+        return redirect(url_for('main.index')) # POPRAWKA
 
     ips = request.form.getlist("device_ip")
     if not ips:
         flash("Nie wybrano żadnego urządzenia.")
-        return redirect(url_for('main.index'))
+        return redirect(url_for('main.index')) # POPRAWKA
 
-    # Pobieramy realną aplikację (proxy), żeby przekazać ją do wątku
     app = current_app._get_current_object()
 
     def worker(app_obj, selected_ips):
@@ -48,7 +47,7 @@ def backup_selected():
     t = threading.Thread(target=worker, args=(app, ips))
     t.start()
     flash(f"Uruchomiono backup dla {len(ips)} urządzeń.")
-    return redirect(url_for('main.index'))
+    return redirect(url_for('main.index')) # POPRAWKA
 
 
 @backup_bp.route("/backup/cancel", methods=["POST"])
@@ -56,7 +55,7 @@ def backup_selected():
 def backup_cancel():
     backup_service.request_cancel()
     flash("Wysłano żądanie anulowania.")
-    return redirect(url_for("main.index"))
+    return redirect(url_for("main.index")) # POPRAWKA
 
 
 @backup_bp.route("/backup/view/<int:log_id>")
@@ -101,6 +100,7 @@ def delete_backup(log_id):
         flash(f"Usunięto backup {log.filename}")
     except Exception as e:
         flash(f"Błąd usuwania: {e}")
+    # POPRAWKA: Używamy main.index jako fallbacku, referrer zadziała sam
     return redirect(request.referrer or url_for('main.index'))
 
 
@@ -123,7 +123,7 @@ def download_latest_backups_all():
     logs = BackupLog.query.filter_by(status='success').order_by(BackupLog.created_at.desc()).limit(500).all()
     if not logs:
         flash("Brak backupów do pobrania.")
-        return redirect(url_for("backup.show_latest_backups"))
+        return redirect(url_for("backup.show_latest_backups")) # POPRAWKA
 
     seen_ips = set()
     unique_logs = []

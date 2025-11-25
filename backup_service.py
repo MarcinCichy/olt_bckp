@@ -16,7 +16,6 @@ class BackupService:
         self.app = app
         self.backup_dir = Path(config.BACKUP_DIR)
         self.backup_dir.resolve().mkdir(parents=True, exist_ok=True)
-        # Logowanie ścieżki (zostawiamy, przydaje się)
         logger.info(f"--> KATALOG BACKUPÓW: {self.backup_dir.resolve()}")
 
         self._lock = threading.Lock()
@@ -71,9 +70,14 @@ class BackupService:
     def _process_single_device(self, db_dev, trigger_type):
         ip = db_dev.ip
 
-        db_dev.last_status = 'running'
-        db_dev.last_error = None
-        db.session.commit()
+        # 1. Start - ustawiamy status running
+        try:
+            db_dev.last_status = 'running'
+            db_dev.last_error = None
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            return  # Jeśli nie możemy zapisać statusu start, to i tak nic nie zrobimy
 
         ssh_dev = SSHDevice(
             ip=ip,
@@ -83,10 +87,11 @@ class BackupService:
         )
 
         try:
+            # 2. Logika SSH
             ssh_dev.connect()
             ssh_dev.run_commands()
             content, sysname = ssh_dev.get_result()
-            ssh_dev.disconnect()
+            # Usuwamy ssh_dev.disconnect() stąd - wykona się w finally
 
             if sysname:
                 db_dev.sysname = sysname
@@ -99,6 +104,7 @@ class BackupService:
                 filename = f"{base_name}_{timestamp}.txt"
                 file_path = self.backup_dir / filename
 
+                # 3. Zapis (zwróci False jeśli szyfrowanie zawiedzie przy obecnym kluczu)
                 if security_utils.encrypt_to_file(content, file_path):
                     db_dev.last_status = 'success'
                     db_dev.last_backup_time = datetime.now()
@@ -117,19 +123,28 @@ class BackupService:
                         self._cleanup_old_backups(ip)
                 else:
                     db_dev.last_status = 'error'
-                    db_dev.last_error = "Błąd zapisu/szyfrowania pliku na dysku"
+                    db_dev.last_error = "Błąd szyfrowania: Sprawdź klucz w .env!"
             else:
                 db_dev.last_status = 'error'
                 db_dev.last_error = "Pusta konfiguracja lub błąd komendy"
 
+            db.session.commit()
+
         except Exception as e:
-            db_dev.last_status = 'error'
-            db_dev.last_error = str(e)
+            # KLUCZOWA ZMIANA: Rollback w przypadku błędu
+            db.session.rollback()
             logger.error(f"Exception device {ip}: {e}")
+
+            # Próba zapisania błędu do bazy (w nowej transakcji po rollbacku)
+            try:
+                db_dev.last_status = 'error'
+                db_dev.last_error = str(e)[:250]  # Przycinamy na wszelki wypadek
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+
         finally:
             ssh_dev.disconnect()
-
-        db.session.commit()
 
     def _cleanup_old_backups(self, ip: str):
         try:

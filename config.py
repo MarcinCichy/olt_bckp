@@ -23,9 +23,19 @@ else:
 SQLALCHEMY_TRACK_MODIFICATIONS = False
 
 # === BEZPIECZEŃSTWO ===
-SECRET_KEY = os.getenv("SECRET_KEY", os.urandom(24))
-SESSION_PERMANENT = False
-PERMANENT_SESSION_LIFETIME = timedelta(minutes=30)
+# Klucz sesji: W produkcji powinien być stały (z .env).
+# Jeśli nie ma go w .env, generujemy losowy, ale to spowoduje wylogowanie wszystkich po restarcie serwera.
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    # Fallback dla deweloperki
+    SECRET_KEY = os.urandom(24)
+    print("UWAGA: Brak SECRET_KEY w .env! Używam losowego klucza (sesje wygasną po restarcie).")
+
+# Konfiguracja wygasania sesji
+# Ustawiamy na True, aby korzystać z PERMANENT_SESSION_LIFETIME
+SESSION_PERMANENT = True
+PERMANENT_SESSION_LIFETIME = timedelta(minutes=10)
+
 BACKUP_ENCRYPTION_KEY = os.getenv("BACKUP_ENCRYPTION_KEY")
 
 # === KONFIGURACJA BACKUPU ===

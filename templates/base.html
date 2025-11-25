@@ -25,9 +25,9 @@
             <div>
                 <h1 class="h4 mb-1">OLT Backup – panel Web</h1>
                 <nav class="small">
-                    <a href="{{ url_for('index') }}" class="me-2">Strona główna</a>
+                    <a href="{{ url_for('main.index') }}" class="me-2">Strona główna</a>
                     <span class="text-muted">|</span>
-                    <a href="{{ url_for('show_latest_backups') }}" class="mx-2">Ostatnie backupy</a>
+                    <a href="{{ url_for('backup.show_latest_backups') }}" class="mx-2">Ostatnie backupy</a>
 
                     {% if current_user.is_authenticated and current_user.is_admin %}
                     <span class="text-muted">|</span>
@@ -48,11 +48,11 @@
 </header>
 
 <main class="container my-3 main-content">
-    {% with messages = get_flashed_messages() %}
+    {% with messages = get_flashed_messages(with_categories=True) %}
       {% if messages %}
         <div class="mb-3">
-          {% for message in messages %}
-            <div class="alert alert-info mb-2" role="alert">
+          {% for category, message in messages %}
+            <div class="alert alert-{{ 'info' if category == 'message' else category }} mb-2" role="alert">
               {{ message }}
             </div>
           {% endfor %}
@@ -74,7 +74,7 @@
 <script>
     document.addEventListener('DOMContentLoaded', function () {
 
-        // --- 1. Obsługa przełączania motywu (Dark/Light) ---
+        // --- Obsługa przełączania motywu (Dark/Light) ---
         var btn = document.getElementById('theme-toggle');
         var icon = document.getElementById('theme-icon');
 
@@ -102,27 +102,6 @@
                 updateIcon();
             });
         }
-
-        // --- 2. ZAAWANSOWANE BEZPIECZEŃSTWO: Wylogowanie po zamknięciu karty ---
-
-        // Pobieramy status zalogowania z backendu (Jinja renderuje to jako tekst "True" lub "False")
-        var isBackendAuthenticated = "{{ current_user.is_authenticated }}" === "True";
-
-        if (isBackendAuthenticated) {
-            // Sprawdzamy, czy w tej sesji przeglądarki (karcie) mamy ustawioną flagę
-            var sessionFlag = sessionStorage.getItem("olt_session_active");
-
-            if (!sessionFlag) {
-                // Jeśli backend mówi "Zalogowany", ale flaga w sessionStorage nie istnieje,
-                // to znaczy, że użytkownik zamknął wcześniej kartę/przeglądarkę.
-                // Wymuszamy wylogowanie (kill cookie).
-                window.location.href = "{{ url_for('auth.logout') }}";
-            }
-        }
-
-        // Ustawiamy flagę, że ta karta jest aktywna.
-        // sessionStorage jest kasowane po zamknięciu karty, ale zostaje po odświeżeniu (F5).
-        sessionStorage.setItem("olt_session_active", "1");
     });
 </script>
 
