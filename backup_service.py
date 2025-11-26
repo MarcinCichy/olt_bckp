@@ -77,7 +77,10 @@ class BackupService:
             db.session.commit()
         except Exception:
             db.session.rollback()
-            return  # Jeśli nie możemy zapisać statusu start, to i tak nic nie zrobimy
+            # Jeśli nie możemy zapisać statusu "running", to prawdopodobnie z bazą jest coś nie tak.
+            # Ale próbujemy robić backup dalej? Raczej nie, bo nie zapiszemy wyniku.
+            logger.error(f"Błąd bazy danych przy starcie backupu dla {ip} - pomijam.")
+            return
 
         ssh_dev = SSHDevice(
             ip=ip,
@@ -87,11 +90,10 @@ class BackupService:
         )
 
         try:
-            # 2. Logika SSH
+            # 2. Logika SSH (może rzucić wyjątkiem)
             ssh_dev.connect()
             ssh_dev.run_commands()
             content, sysname = ssh_dev.get_result()
-            # Usuwamy ssh_dev.disconnect() stąd - wykona się w finally
 
             if sysname:
                 db_dev.sysname = sysname
@@ -104,7 +106,8 @@ class BackupService:
                 filename = f"{base_name}_{timestamp}.txt"
                 file_path = self.backup_dir / filename
 
-                # 3. Zapis (zwróci False jeśli szyfrowanie zawiedzie przy obecnym kluczu)
+                # 3. Zapis i Szyfrowanie
+                # security_utils.encrypt_to_file rzuca False lub Exception przy problemach
                 if security_utils.encrypt_to_file(content, file_path):
                     db_dev.last_status = 'success'
                     db_dev.last_backup_time = datetime.now()
@@ -122,25 +125,31 @@ class BackupService:
                     if trigger_type == 'cron':
                         self._cleanup_old_backups(ip)
                 else:
+                    # encrypt_to_file zwróciło False tylko jeśli złapano błąd wewnątrz
+                    # (ale teraz w security_utils mamy fail-fast, więc to raczej rzadkie)
                     db_dev.last_status = 'error'
-                    db_dev.last_error = "Błąd szyfrowania: Sprawdź klucz w .env!"
+                    db_dev.last_error = "Błąd zapisu pliku (sprawdź logi / klucz szyfrowania)"
             else:
                 db_dev.last_status = 'error'
-                db_dev.last_error = "Pusta konfiguracja lub błąd komendy"
+                db_dev.last_error = "Pusta konfiguracja lub błąd komendy SSH"
 
             db.session.commit()
 
         except Exception as e:
-            # KLUCZOWA ZMIANA: Rollback w przypadku błędu
+            # KLUCZOWY ROLLBACK
             db.session.rollback()
             logger.error(f"Exception device {ip}: {e}")
 
-            # Próba zapisania błędu do bazy (w nowej transakcji po rollbacku)
+            # Próba zapisania błędu do bazy w nowej transakcji
             try:
+                # Odświeżamy obiekt (bo po rollbacku może być odłączony)
+                # W prostym scenariuszu db_dev jest wciąż w sesji, ale bezpieczniej pobrać ponownie lub uważać.
+                # Tutaj, ponieważ rollback cofnął status 'running', ustawiamy 'error'.
                 db_dev.last_status = 'error'
-                db_dev.last_error = str(e)[:250]  # Przycinamy na wszelki wypadek
+                db_dev.last_error = str(e)[:250]
                 db.session.commit()
-            except Exception:
+            except Exception as e2:
+                logger.error(f"Nie udało się zapisać statusu błędu do DB dla {ip}: {e2}")
                 db.session.rollback()
 
         finally:
@@ -169,5 +178,10 @@ class BackupService:
                     count += 1
 
                 logger.info(f"Rotacja (Cron) dla {ip}: usunięto {count} starych plików.")
+                # Commit nie jest tu potrzebny explicite, bo funkcja nadrzędna robi commit,
+                # ale dla bezpieczeństwa przy rotacji można:
+                # db.session.commit()
+                # Jednak zostawiamy to nadrzędnej metodzie (jest w bloku try głównej pętli lub metody).
+                # W obecnej strukturze _cleanup jest wywoływany przed commitem w _process_single_device, więc OK.
         except Exception as e:
             logger.error(f"Błąd rotacji dla {ip}: {e}")
