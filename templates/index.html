@@ -52,7 +52,9 @@
         <thead>
         <tr>
             <th style="width: 40px;">#</th>
-            <th>Adres IP / sysname</th>
+            <th onclick="sortDevicesByIP()" style="cursor: pointer; user-select: none;" title="Kliknij, aby posortować po IP">
+                Adres IP / sysname <span id="sort-icon" class="text-muted small">⇅</span>
+            </th>
             <th style="width: 160px;">Ostatni backup</th>
             <th style="width: 80px;">Status</th>
             <th style="width: 180px;">Akcje</th>
@@ -169,18 +171,73 @@
 {% block extra_scripts %}
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+        // --- Obsługa "Zaznacz wszystkie" ---
         var selectAll = document.getElementById('select-all');
-        var rows = Array.from(document.querySelectorAll('#device-table tbody tr'));
+        var deviceTable = document.getElementById('device-table');
 
-        if (selectAll) {
+        if (selectAll && deviceTable) {
             selectAll.addEventListener('change', function () {
+                // Pobieramy checkboxy dynamicznie, bo po sortowaniu kolejność w DOM się zmienia
+                var checkboxes = deviceTable.querySelectorAll('tbody input[type="checkbox"][name="device_ip"]');
                 var checked = selectAll.checked;
-                rows.forEach(function (row) {
-                    var cb = row.querySelector('input[type="checkbox"][name="device_ip"]');
-                    if (cb) cb.checked = checked;
+                checkboxes.forEach(function (cb) {
+                    cb.checked = checked;
                 });
             });
         }
     });
+
+    // --- LOGIKA SORTOWANIA IP ---
+    let sortDirection = 1; // 1 = rosnąco, -1 = malejąco
+
+    function sortDevicesByIP() {
+        const tableBody = document.querySelector('#device-table tbody');
+        if (!tableBody) return;
+
+        const rows = Array.from(tableBody.querySelectorAll('tr'));
+        const icon = document.getElementById('sort-icon');
+
+        // Zmieniamy kierunek sortowania
+        sortDirection *= -1;
+
+        // Aktualizacja ikony
+        if (icon) {
+            if (sortDirection === 1) icon.innerHTML = '▲'; // Rosnąco
+            else icon.innerHTML = '▼'; // Malejąco
+        }
+
+        rows.sort((rowA, rowB) => {
+            // Szukamy elementu z klasą .fw-semibold gdzie jest sam adres IP
+            const elA = rowA.querySelector('.fw-semibold');
+            const elB = rowB.querySelector('.fw-semibold');
+
+            const ipA = elA ? elA.innerText.trim() : "";
+            const ipB = elB ? elB.innerText.trim() : "";
+
+            return compareIPs(ipA, ipB) * sortDirection;
+        });
+
+        // Wstawiamy posortowane wiersze z powrotem do tabeli
+        rows.forEach(row => tableBody.appendChild(row));
+    }
+
+    // Helper: Porównuje adresy IP numerycznie oktet po oktecie
+    function compareIPs(a, b) {
+        if (!a) return -1;
+        if (!b) return 1;
+
+        const partsA = a.split('.').map(Number);
+        const partsB = b.split('.').map(Number);
+
+        for (let i = 0; i < 4; i++) {
+            // Zabezpieczenie na wypadek dziwnych formatów
+            const numA = isNaN(partsA[i]) ? 0 : partsA[i];
+            const numB = isNaN(partsB[i]) ? 0 : partsB[i];
+
+            if (numA > numB) return 1;
+            if (numA < numB) return -1;
+        }
+        return 0;
+    }
 </script>
 {% endblock %}
