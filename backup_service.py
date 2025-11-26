@@ -1,5 +1,6 @@
 # backup_service.py
 import threading
+import time
 from pathlib import Path
 from datetime import datetime
 
@@ -9,6 +10,8 @@ import config
 from extensions import db
 from models import Device as DBDevice, BackupLog
 import security_utils
+# NOWY IMPORT
+from notification_service import NotificationService
 
 
 class BackupService:
@@ -47,19 +50,50 @@ class BackupService:
             return
 
         self._cancel_requested = False
+
+        # === ZMIENNE DO STATYSTYK ===
+        start_time = time.time()
+        total_devices = 0
+        success_count = 0
+        fail_count = 0
+        failed_ips = []
+        # ============================
+
         try:
             devices = DBDevice.query.filter_by(enabled=True).all()
             if selected_ips:
                 devices = [d for d in devices if d.ip in selected_ips]
 
-            logger.info(f"Start backupu {len(devices)} urządzeń. Typ: {trigger_type}")
+            total_devices = len(devices)
+            logger.info(f"Start backupu {total_devices} urządzeń. Typ: {trigger_type}")
 
             for dev in devices:
                 if self._cancel_requested:
                     logger.info("Przerwano backup.")
                     break
 
-                self._process_single_device(dev, trigger_type)
+                # Odbieramy wynik operacji (True/False)
+                is_success = self._process_single_device(dev, trigger_type)
+
+                if is_success:
+                    success_count += 1
+                else:
+                    fail_count += 1
+                    failed_ips.append(dev.ip)
+
+            # === WYSYŁANIE POWIADOMIENIA (TYLKO CRON) ===
+            # Nie wysyłamy powiadomień przy ręcznym uruchomieniu z GUI,
+            # chyba że chcesz usunąć ten warunek 'if'.
+            if trigger_type == 'cron':
+                duration = time.time() - start_time
+                NotificationService.send_backup_summary(
+                    total=total_devices,
+                    success=success_count,
+                    failed=fail_count,
+                    failed_ips=failed_ips,
+                    duration_seconds=duration
+                )
+            # ============================================
 
         except Exception as e:
             logger.error(f"Błąd w pętli backupu: {e}")
@@ -67,8 +101,13 @@ class BackupService:
             self._lock.release()
             self._cancel_requested = False
 
-    def _process_single_device(self, db_dev, trigger_type):
+    def _process_single_device(self, db_dev, trigger_type) -> bool:
+        """
+        Przetwarza jedno urządzenie.
+        Zwraca True jeśli backup zakończył się sukcesem, False w przeciwnym razie.
+        """
         ip = db_dev.ip
+        success_flag = False  # Flaga wyniku
 
         # 1. Start - ustawiamy status running
         try:
@@ -77,10 +116,8 @@ class BackupService:
             db.session.commit()
         except Exception:
             db.session.rollback()
-            # Jeśli nie możemy zapisać statusu "running", to prawdopodobnie z bazą jest coś nie tak.
-            # Ale próbujemy robić backup dalej? Raczej nie, bo nie zapiszemy wyniku.
             logger.error(f"Błąd bazy danych przy starcie backupu dla {ip} - pomijam.")
-            return
+            return False
 
         ssh_dev = SSHDevice(
             ip=ip,
@@ -107,7 +144,6 @@ class BackupService:
                 file_path = self.backup_dir / filename
 
                 # 3. Zapis i Szyfrowanie
-                # security_utils.encrypt_to_file rzuca False lub Exception przy problemach
                 if security_utils.encrypt_to_file(content, file_path):
                     db_dev.last_status = 'success'
                     db_dev.last_backup_time = datetime.now()
@@ -124,9 +160,9 @@ class BackupService:
 
                     if trigger_type == 'cron':
                         self._cleanup_old_backups(ip)
+
+                    success_flag = True  # SUKCES!
                 else:
-                    # encrypt_to_file zwróciło False tylko jeśli złapano błąd wewnątrz
-                    # (ale teraz w security_utils mamy fail-fast, więc to raczej rzadkie)
                     db_dev.last_status = 'error'
                     db_dev.last_error = "Błąd zapisu pliku (sprawdź logi / klucz szyfrowania)"
             else:
@@ -142,9 +178,6 @@ class BackupService:
 
             # Próba zapisania błędu do bazy w nowej transakcji
             try:
-                # Odświeżamy obiekt (bo po rollbacku może być odłączony)
-                # W prostym scenariuszu db_dev jest wciąż w sesji, ale bezpieczniej pobrać ponownie lub uważać.
-                # Tutaj, ponieważ rollback cofnął status 'running', ustawiamy 'error'.
                 db_dev.last_status = 'error'
                 db_dev.last_error = str(e)[:250]
                 db.session.commit()
@@ -154,6 +187,8 @@ class BackupService:
 
         finally:
             ssh_dev.disconnect()
+
+        return success_flag
 
     def _cleanup_old_backups(self, ip: str):
         try:
@@ -178,10 +213,5 @@ class BackupService:
                     count += 1
 
                 logger.info(f"Rotacja (Cron) dla {ip}: usunięto {count} starych plików.")
-                # Commit nie jest tu potrzebny explicite, bo funkcja nadrzędna robi commit,
-                # ale dla bezpieczeństwa przy rotacji można:
-                # db.session.commit()
-                # Jednak zostawiamy to nadrzędnej metodzie (jest w bloku try głównej pętli lub metody).
-                # W obecnej strukturze _cleanup jest wywoływany przed commitem w _process_single_device, więc OK.
         except Exception as e:
             logger.error(f"Błąd rotacji dla {ip}: {e}")
