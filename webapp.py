@@ -67,6 +67,7 @@ def init_db():
     db.create_all()
     print("Baza danych zainicjalizowana.")
 
+
 @app.cli.command("update-schema")
 def update_schema():
     try:
@@ -75,15 +76,19 @@ def update_schema():
                 with db.engine.connect() as conn:
                     try:
                         conn.execute(text("ALTER TABLE users ADD COLUMN is_admin BOOLEAN DEFAULT 0"))
-                    except Exception: pass
+                    except Exception:
+                        pass
                     try:
-                        conn.execute(text("ALTER TABLE backup_logs ADD COLUMN trigger_type VARCHAR(20) DEFAULT 'manual'"))
-                    except Exception: pass
+                        conn.execute(
+                            text("ALTER TABLE backup_logs ADD COLUMN trigger_type VARCHAR(20) DEFAULT 'manual'"))
+                    except Exception:
+                        pass
                     conn.commit()
             else:
                 print("Update schema only for SQLite.")
     except Exception as e:
         print(f"Error: {e}")
+
 
 @app.cli.command("create-user")
 @click.argument("username")
@@ -99,6 +104,7 @@ def create_user(username, password, admin):
     db.session.add(u)
     db.session.commit()
     print(f"Utworzono użytkownika: {username}")
+
 
 @app.cli.command("import-devices")
 def import_devices():
@@ -116,7 +122,33 @@ def import_devices():
     except FileNotFoundError:
         print("Plik devices.txt nie istnieje.")
 
+
+# === FUNKCJA NAPRAWCZA (SYSTEM CLEANUP) ===
+def reset_stuck_backups():
+    """
+    Funkcja uruchamiana przy starcie. Sprawdza, czy w bazie są urządzenia
+    z ustawionym statusem 'running' (np. po awarii prądu lub restarcie kontenera).
+    Jeśli tak - zmienia ich status na 'error'.
+    """
+    try:
+        with app.app_context():
+            stuck_devices = Device.query.filter_by(last_status='running').all()
+            if stuck_devices:
+                print(f" ---> [SYSTEM] Wykryto {len(stuck_devices)} przerwanych zadań backupu. Resetowanie statusów...")
+                for d in stuck_devices:
+                    d.last_status = 'error'
+                    d.last_error = "Proces przerwany (restart aplikacji)"
+                db.session.commit()
+                print(" ---> [SYSTEM] Statusy naprawione.")
+    except Exception as e:
+        print(f" ---> [SYSTEM] Błąd podczas czyszczenia statusów: {e}")
+
+
 if __name__ == "__main__":
     with app.app_context():
         db.create_all()
+
+    # Wywołanie czyszczenia "zombie" statusów przed startem serwera
+    reset_stuck_backups()
+
     app.run(host="0.0.0.0", port=5000, debug=True)
