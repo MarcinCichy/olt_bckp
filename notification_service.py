@@ -11,6 +11,7 @@ class NotificationService:
     def send_backup_summary(total, success, failed, failed_ips, duration_seconds):
         """
         Wysyła podsumowanie backupu na Mattermost.
+        Wersja kompaktowa (max 3 linie tekstu dla sukcesu).
         """
         webhook_url = config.MATTERMOST_WEBHOOK_URL
 
@@ -18,34 +19,36 @@ class NotificationService:
             logger.info("Brak konfiguracji MATTERMOST_WEBHOOK_URL - pomijam powiadomienie.")
             return
 
-        # Ustalanie koloru paska (Zielony=OK, Czerwony=Awaria, Żółty=Częściowe błędy)
+        # Kolory paska bocznego
         if failed == 0:
             color = "#00c951"  # Green
-            title = "✅ Backup Automatyczny OLTów: Sukces"
+            status_text = "SUKCES"
         elif success == 0:
             color = "#d10c27"  # Red
-            title = "❌ Backup Automatyczny OLTów: Awaria"
+            status_text = "AWARIA"
         else:
             color = "#ffbc42"  # Orange
-            title = "⚠️ Backup Automatyczny OLTów: Problemy"
+            status_text = "PROBLEMY"
 
-        # Treść wiadomości
-        text_lines = [
-            f"### {title}",
-            f"**Data:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-            f"**Czas trwania:** {duration_seconds:.1f}s",
-            "",
-            "---",
-            f"📊 **Statystyki:**",
-            f"- Razem: **{total}**",
-            f"- ✅ OK: **{success}**",
-            f"- ❌ Błąd: **{failed}**"
-        ]
+        # Budowanie treści wiadomości (Markdown)
+        # Wymaganie: 3 linie, mniejsza czcionka nagłówka, statystyki w jednej linii.
 
+        # Linia 1: Nagłówek (pogrubiony, ale normalna wielkość czcionki)
+        line_1 = f"**Backup Automatyczny: {status_text}**"
+
+        # Linia 2: Data
+        line_2 = f"Data: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+
+        # Linia 3: Statystyki w jednym wierszu
+        # Używamy spacji lub znaku | do separacji
+        line_3 = f"Razem: **{total}** ✅ OK: **{success}** ❌ Błąd: **{failed}**"
+
+        text_lines = [line_1, line_2, line_3]
+
+        # Dodatkowa lista błędów tylko jeśli wystąpiły (pojawią się jako 4. linia i kolejne)
         if failed_ips:
-            text_lines.append("\n**Problematyczne urządzenia:**")
-            for ip in failed_ips:
-                text_lines.append(f"- `{ip}`")
+            text_lines.append("---")
+            text_lines.append("**Błędy IP:** " + ", ".join(failed_ips))
 
         payload = {
             "username": "OLT Backup Bot",
