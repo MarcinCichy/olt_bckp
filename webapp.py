@@ -1,6 +1,6 @@
 # webapp.py
 import click
-from flask import Flask
+from flask import Flask, request
 from sqlalchemy import text
 
 # Importy lokalne
@@ -36,6 +36,24 @@ app.register_blueprint(settings_bp)
 
 # Inicjalizacja serwisu backupu (przypisanie app)
 backup_service.init_app(app)
+
+
+# === FIX: Blokada przycisku WSTECZ po wylogowaniu ===
+@app.after_request
+def add_header(response):
+    """
+    Dodaje nagłówki zabraniające przeglądarce zapisywania stron w cache.
+    Dzięki temu po wylogowaniu i kliknięciu 'Wstecz' strona przeładuje się
+    i wymusi ponowne logowanie.
+    """
+    # Pozwalamy cachować pliki css/js dla wydajności
+    if request.path.startswith('/static'):
+        return response
+
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
 
 
 @login_manager.user_loader
