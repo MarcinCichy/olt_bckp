@@ -123,6 +123,14 @@ def import_devices():
         print("Plik devices.txt nie istnieje.")
 
 
+@app.cli.command("reset-stuck")
+def reset_stuck_command():
+    """Ręczne resetowanie zawieszonych statusów (klepsydry)."""
+    reset_stuck_backups()
+    print("Zakończono resetowanie statusów.")
+
+
+
 # === FUNKCJA NAPRAWCZA (SYSTEM CLEANUP) ===
 def reset_stuck_backups():
     """
