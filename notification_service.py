@@ -31,22 +31,23 @@ class NotificationService:
             status_text = "PROBLEMY"
 
         # Budowanie treści wiadomości (Markdown)
-        # Wymaganie: 3 linie, mniejsza czcionka nagłówka, statystyki w jednej linii.
 
-        # Linia 1: Nagłówek (pogrubiony, ale normalna wielkość czcionki)
+        # Linia 1: Nagłówek
         line_1 = f"**Backup Automatyczny: {status_text}**"
 
         # Linia 2: Data
         line_2 = f"Data: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
 
-        # Linia 3: Statystyki w jednym wierszu
-        # Używamy spacji lub znaku | do separacji
+        # Linia 3: Statystyki
         line_3 = f"Razem: **{total}** ✅ OK: **{success}** ❌ Błąd: **{failed}**"
 
         text_lines = [line_1, line_2, line_3]
 
-        # Dodatkowa lista błędów tylko jeśli wystąpiły (pojawią się jako 4. linia i kolejne)
+        # Dodatkowa lista błędów tylko jeśli wystąpiły
         if failed_ips:
+            # FIX: Dodajemy pusty string przed separatorem,
+            # aby uniknąć zamiany poprzedniej linii w nagłówek H2.
+            text_lines.append("")
             text_lines.append("---")
             text_lines.append("**Błędy IP:** " + ", ".join(failed_ips))
 
