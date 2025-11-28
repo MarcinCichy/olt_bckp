@@ -8,7 +8,7 @@ import config
 from extensions import db, login_manager
 from models import User, Device, Settings, BackupLog
 
-# Importy modułów (Blueprintów) - TERAZ WSZYSTKIE Z ROUTES
+# Importy modułów (Blueprintów)
 from routes.auth_bp import auth_bp
 from routes.user_admin_bp import user_admin_bp
 from routes.main_bp import main_bp
@@ -38,15 +38,38 @@ app.register_blueprint(settings_bp)
 backup_service.init_app(app)
 
 
+# === FILTR DO KOLOROWANIA LOGÓW (POPRAWIONY) ===
+@app.template_filter('colorize_log')
+def colorize_log(line):
+    if not line:
+        return ""
+
+    # 1. Usuwamy białe znaki z początku i końca (kluczowe dla usunięcia podwójnych enterów)
+    line = line.strip()
+
+    # 2. Jeśli po usunięciu spacji linia jest pusta, ignorujemy ją
+    if not line:
+        return ""
+
+    # 3. Nadajemy kolory
+    if "ERROR" in line or "CRITICAL" in line or "FAIL" in line:
+        return f'<span style="color: #ff5f5f;">{line}</span>'  # Czerwony
+    elif "WARNING" in line:
+        return f'<span style="color: #ffcc00;">{line}</span>'  # Żółty
+    elif "INFO" in line:
+        return f'<span style="color: #2ecc71;">{line}</span>'  # Zielony
+    elif "DEBUG" in line:
+        return f'<span style="color: #3498db;">{line}</span>'  # Niebieski
+    else:
+        return f'<span style="color: #cccccc;">{line}</span>'  # Szary
+
+
 # === FIX: Blokada przycisku WSTECZ po wylogowaniu ===
 @app.after_request
 def add_header(response):
     """
     Dodaje nagłówki zabraniające przeglądarce zapisywania stron w cache.
-    Dzięki temu po wylogowaniu i kliknięciu 'Wstecz' strona przeładuje się
-    i wymusi ponowne logowanie.
     """
-    # Pozwalamy cachować pliki css/js dla wydajności
     if request.path.startswith('/static'):
         return response
 
@@ -130,13 +153,11 @@ def reset_stuck_command():
     print("Zakończono resetowanie statusów.")
 
 
-
 # === FUNKCJA NAPRAWCZA (SYSTEM CLEANUP) ===
 def reset_stuck_backups():
     """
     Funkcja uruchamiana przy starcie. Sprawdza, czy w bazie są urządzenia
-    z ustawionym statusem 'running' (np. po awarii prądu lub restarcie kontenera).
-    Jeśli tak - zmienia ich status na 'error'.
+    z ustawionym statusem 'running'. Jeśli tak - zmienia ich status na 'error'.
     """
     try:
         with app.app_context():

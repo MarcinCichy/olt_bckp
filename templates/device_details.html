@@ -113,9 +113,13 @@
     <div id="syslogs" class="collapse show">
         <div class="card-body p-0">
             {% if text_logs %}
-                <pre class="m-0 p-3" style="background-color: #1e1e1e; color: #00ff00; font-size: 0.85rem; max-height: 300px; overflow-y: auto;">
-{% for line in text_logs %}{{ line }}
-{% endfor %}</pre>
+                <div style="background-color: #1e1e1e; font-family: monospace; font-size: 0.85rem; max-height: 300px; overflow-y: auto; padding: 10px;">
+                    {% for line in text_logs %}
+                        {% if line.strip() %}
+                            <div style="margin: 0; line-height: 1.2; white-space: pre-wrap;">{{ line | colorize_log | safe }}</div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
             {% else %}
                 <div class="p-3 text-muted">Brak logów tekstowych dla tego adresu IP w pliku app.log.</div>
             {% endif %}
