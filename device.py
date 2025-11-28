@@ -31,26 +31,50 @@ class Device:
 
     def connect(self) -> None:
         logger.info(f"Łączenie z urządzeniem: {self.ip} jako użytkownik {self.username}")
-        try:
-            self.client = paramiko.SSHClient()
-            self.client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            self.client.load_system_host_keys()
 
-            self.client.connect(
-                self.ip,
-                username=self.username,
-                password=self.password,
-                timeout=config.SSH_TIMEOUT,
-                allow_agent=False,
-                look_for_keys=False
-            )
+        # USTAWIENIA PONAWIANIA
+        max_retries = 3  # Ile razy próbować
+        retry_delay = 10  # Ile sekund czekać między próbami
 
-            self.channel = self.client.invoke_shell()
-            time.sleep(1)
+        self.client = paramiko.SSHClient()
+        self.client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        self.client.load_system_host_keys()
 
-        except (paramiko.AuthenticationException, paramiko.SSHException, socket.error) as e:
-            logger.error(f"Błąd połączenia z {self.ip}: {e}")
-            raise
+        last_exception = None
+
+        for attempt in range(1, max_retries + 1):
+            try:
+                if attempt > 1:
+                    logger.info(f"--> [RETRY] Ponawiam połączenie z {self.ip} (Próba {attempt}/{max_retries})...")
+
+                self.client.connect(
+                    self.ip,
+                    username=self.username,
+                    password=self.password,
+                    timeout=config.SSH_TIMEOUT,
+                    allow_agent=False,
+                    look_for_keys=False
+                )
+
+                self.channel = self.client.invoke_shell()
+                time.sleep(1)
+
+                # Jeśli dotarliśmy tutaj, to sukces - wychodzimy z funkcji connect
+                if attempt > 1:
+                    logger.info(f"--> [SUKCES] Połączono za {attempt}. razem!")
+                return
+
+            except (paramiko.AuthenticationException, paramiko.SSHException, socket.error) as e:
+                last_exception = e
+                logger.warning(f"Błąd przy próbie {attempt} dla {self.ip}: {e}")
+
+                # Jeśli to nie była ostatnia próba, czekamy i pętla leci dalej
+                if attempt < max_retries:
+                    time.sleep(retry_delay)
+                else:
+                    # To była ostatnia próba - poddajemy się
+                    logger.error(f"Krytyczny błąd połączenia z {self.ip} po {max_retries} próbach.")
+                    raise last_exception
 
     def execute_command(self, command: str) -> str:
         if not command:
