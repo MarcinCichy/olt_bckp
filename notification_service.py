@@ -38,7 +38,8 @@ class NotificationService:
         # Linia 2: Data
         line_2 = f"Data: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
 
-        # Linia 3: Statystyki
+        # Linia 3: Statystyki - ZMIANA: Usunięcie ewentualnych znaków '#' i formatowanie jako zwykły tekst
+        # Zostawiamy tylko **gwiazdki** przy liczbach, żeby były pogrubione, ale czcionka będzie mała.
         line_3 = f"Razem: **{total}** ✅ OK: **{success}** ❌ Błąd: **{failed}**"
 
         text_lines = [line_1, line_2, line_3]
@@ -49,7 +50,7 @@ class NotificationService:
             # aby uniknąć zamiany poprzedniej linii w nagłówek H2.
             text_lines.append("")
             text_lines.append("---")
-            text_lines.append("**Błędy IP:** " + ", ".join(failed_ips))
+            text_lines.append(f"**Błędy IP:** {', '.join(failed_ips)}")
 
         payload = {
             "username": "OLT Backup Bot",

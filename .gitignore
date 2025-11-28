@@ -40,3 +40,7 @@ __pycache__
 __pycache/
 tests/
 old_files/
+
+migracja_kluczy.py
+auto_naprawa.py
+weryfikacja.py
